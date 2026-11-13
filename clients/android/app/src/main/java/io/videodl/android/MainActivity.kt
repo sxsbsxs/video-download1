@@ -137,8 +137,7 @@ class MainActivity : ComponentActivity() {
                     val result = LocalYtDlpEngine.inspect(this@MainActivity, currentInput)
                     mediaInfo = result
                     selectedFormatTab = if (result.videoFormats.isNotEmpty()) 0 else 1
-                    selectedFormatKey = result.videoFormats.firstOrNull()?.key
-                        ?: result.audioFormats.firstOrNull()?.key.orEmpty()
+                    selectedFormatKey = ""
                     currentInput = result.sourceUrl
                     val host = Uri.parse(result.sourceUrl).host.orEmpty().lowercase(Locale.ROOT)
                     val highestHeight = result.videoFormats.maxOfOrNull { it.height } ?: 0
@@ -341,6 +340,9 @@ class MainActivity : ComponentActivity() {
                 .put("dynamicRange", format.dynamicRange)
                 .put("extension", format.extension)
                 .put("isAudio", format.isAudio)
+                .put("bitrate", format.bitrate)
+                .put("videoCodec", format.videoCodec)
+                .put("audioCodec", format.audioCodec)
                 .put("groupKey", groupKey))
         }
         return array
