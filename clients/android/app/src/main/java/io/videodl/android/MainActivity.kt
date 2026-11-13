@@ -7,12 +7,29 @@ import android.os.Environment
 import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -51,13 +68,62 @@ class MainActivity : ComponentActivity() {
             else -> ""
         }
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+            VideoDLTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     VideoDLScreen(sharedText)
                 }
             }
         }
     }
+}
+
+@Composable
+private fun VideoDLTheme(content: @Composable () -> Unit) {
+    val colors = darkColorScheme(
+        primary = Color(0xFF8AB4FF),
+        onPrimary = Color(0xFF071426),
+        primaryContainer = Color(0xFF203B63),
+        onPrimaryContainer = Color(0xFFDCE9FF),
+        secondary = Color(0xFF66D6C2),
+        onSecondary = Color(0xFF06231E),
+        secondaryContainer = Color(0xFF16463F),
+        onSecondaryContainer = Color(0xFFB9F4E8),
+        background = Color(0xFF080D17),
+        onBackground = Color(0xFFF1F5FC),
+        surface = Color(0xFF111A29),
+        onSurface = Color(0xFFEAF0FA),
+        surfaceVariant = Color(0xFF1A2638),
+        onSurfaceVariant = Color(0xFFAAB8CC),
+        error = Color(0xFFFF8A8A),
+        errorContainer = Color(0xFF54282D),
+        onErrorContainer = Color(0xFFFFDADA)
+    )
+    MaterialTheme(colorScheme = colors, content = content)
+}
+
+@Composable
+private fun VideoDLQualityChip(
+    label: String,
+    value: String,
+    selectedValue: String,
+    modifier: Modifier = Modifier,
+    onSelect: (String) -> Unit
+) {
+    FilterChip(
+        selected = selectedValue == value,
+        onClick = { onSelect(value) },
+        label = { Text(label, maxLines = 1) },
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    )
 }
 
 private val httpClient = OkHttpClient.Builder()
@@ -98,34 +164,151 @@ private fun VideoDLScreen(initialSharedText: String = "") {
     var historyLoading by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 18.dp, vertical = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("VideoDL", style = MaterialTheme.typography.headlineMedium)
-        Text("多语言视频下载客户端", style = MaterialTheme.typography.bodyMedium)
-        OutlinedTextField(
-            value = apiBase, onValueChange = {
-                apiBase = it
-                prefs.edit().putString("apiBase", it).apply()
-            }, modifier = Modifier.fillMaxWidth(),
-            label = { Text("服务端 API 地址（HTTPS）") },
-            placeholder = { Text("https://your-videodl-service.example") }, singleLine = true
-        )
-        OutlinedTextField(
-            value = videoUrl, onValueChange = {
-                videoUrl = it
-                prefs.edit().putString("videoUrl", it).apply()
-            }, modifier = Modifier.fillMaxWidth(),
-            label = { Text("视频链接") }, placeholder = { Text("可粘贴整段分享文案，自动识别其中的链接") }, minLines = 2
-        )
-        OutlinedTextField(
-            value = quality, onValueChange = {
-                quality = it
-                prefs.edit().putString("quality", it).apply()
-            }, modifier = Modifier.fillMaxWidth(),
-            label = { Text("画质（best / 1080 / 720 / audio）") }, singleLine = true
-        )
-        Button(
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(54.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.primary
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        "V",
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                }
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text("VideoDL", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onBackground)
+                Text(
+                    "VIDEO DOWNLOAD MANAGER",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Text(
+                    "多平台",
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("服务端连接", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "填写你的 VideoDL API 地址",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = if (apiBase.isBlank()) MaterialTheme.colorScheme.errorContainer
+                        else MaterialTheme.colorScheme.secondaryContainer
+                    ) {
+                        Text(
+                            if (apiBase.isBlank()) "未配置" else "已填写",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (apiBase.isBlank()) MaterialTheme.colorScheme.onErrorContainer
+                            else MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = apiBase, onValueChange = {
+                        apiBase = it
+                        prefs.edit().putString("apiBase", it).apply()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("服务端 API 地址") },
+                    placeholder = { Text("https://your-videodl-service.example") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp)
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(13.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("新建下载", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "粘贴视频链接，或直接分享整段文案",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                OutlinedTextField(
+                    value = videoUrl, onValueChange = {
+                        videoUrl = it
+                        prefs.edit().putString("videoUrl", it).apply()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("视频链接或分享内容") },
+                    placeholder = { Text("把复制的视频链接或分享文案粘贴到这里…") },
+                    minLines = 3,
+                    shape = RoundedCornerShape(18.dp)
+                )
+                Text("下载画质", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    VideoDLQualityChip("最佳", "best", quality, Modifier.weight(1f)) {
+                        quality = it
+                        prefs.edit().putString("quality", it).apply()
+                    }
+                    VideoDLQualityChip("1080P", "1080", quality, Modifier.weight(1f)) {
+                        quality = it
+                        prefs.edit().putString("quality", it).apply()
+                    }
+                    VideoDLQualityChip("720P", "720", quality, Modifier.weight(1f)) {
+                        quality = it
+                        prefs.edit().putString("quality", it).apply()
+                    }
+                    VideoDLQualityChip("音频", "audio", quality, Modifier.weight(1f)) {
+                        quality = it
+                        prefs.edit().putString("quality", it).apply()
+                    }
+                }
+                
+                        Button(
             enabled = !busy && apiBase.isNotBlank() && videoUrl.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
             onClick = {
@@ -157,21 +340,30 @@ private fun VideoDLScreen(initialSharedText: String = "") {
                     }
                 }
             }
-        ) { Text(if (busy) "处理中…" else "解析视频") }
+        ) { Text(if (busy) "处理中…" else "解析视频") }            }
+        }
+
 
         if (title.isNotBlank()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(14.dp)) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("视频信息", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                     thumbnail?.let {
                         AsyncImage(
                             model = it,
                             contentDescription = "视频封面",
-                            modifier = Modifier.fillMaxWidth().height(190.dp)
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(16.dp))
                         )
-                        Spacer(Modifier.height(8.dp))
                     }
-                    Text(title, style = MaterialTheme.typography.titleMedium)
-                    if (uploader.isNotBlank()) Text("上传者：" + uploader)
+                    Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
+                    if (uploader.isNotBlank()) {
+                        Text("上传者  " + uploader, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
             Button(
@@ -284,11 +476,35 @@ private fun VideoDLScreen(initialSharedText: String = "") {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
 
-        Text(status, style = MaterialTheme.typography.bodyMedium)
-
-        Button(
-            enabled = !historyLoading && apiBase.isNotBlank(),
+        Card(
             modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f), modifier = Modifier.size(34.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(if (busy) "…" else "i", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("下载记录", style = MaterialTheme.typography.titleLarge)
+                Text("查看进度、重试任务或重新保存文件", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            OutlinedButton(
+            enabled = !historyLoading && apiBase.isNotBlank(),
             onClick = {
                 scope.launch {
                     historyLoading = true
@@ -303,10 +519,26 @@ private fun VideoDLScreen(initialSharedText: String = "") {
                     }
                 }
             }
-        ) { Text(if (historyLoading) "正在读取下载记录…" else "刷新下载历史") }
+            ) { Text(if (historyLoading) "读取中…" else "刷新") }
+        }
 
-        if (recentTasks.isNotEmpty()) {
-            Text("最近下载", style = MaterialTheme.typography.titleLarge)
+        if (recentTasks.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp, horizontal = 18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("↓", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("还没有下载记录", style = MaterialTheme.typography.titleMedium)
+                    Text("完成解析并开始下载后，任务会显示在这里", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else {
             recentTasks.forEach { item ->
                 val taskId = item.optString("id")
                 val taskState = item.optString("state", "unknown")
@@ -319,9 +551,13 @@ private fun VideoDLScreen(initialSharedText: String = "") {
                 } else {
                     null
                 }
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
                     Column(
-                        modifier = Modifier.padding(14.dp),
+                        modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(fileName, style = MaterialTheme.typography.titleMedium)
