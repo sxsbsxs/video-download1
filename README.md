@@ -4,14 +4,14 @@ VideoDL 是以 Android 原生应用为主的视频下载工具。Android App 内
 
 ## Android 功能
 
-- Google Material 3 风格 UI，底部独立「首页 / 下载 / 设置」页面。
+- 原生 Kotlin + Jetpack Compose + Material 3 界面，不使用 WebView/HTML 页面；底部导航包含「下载 / 文件 / 设置」。
 - 粘贴 URL 或整段分享文案，也支持 Android 系统分享。
 - 显示 yt-dlp 从来源实际读取的分辨率、FPS、HDR/动态范围、编码、容器和格式 ID。
-- 支持同一画质下展开选择其他编码版本。
-- 封面优先选取来源可用的高分辨率缩略图，下载、校验、缩放并转成 JPEG 缓存到本机后显示。
-- 文件大小只采用来源提供的精确或近似大小；近似值标注「约」。缺少任一分离流的大小时显示「大小未知」，不再从码率猜测文件大小。
+- 支持视频与音频格式独立选择，保留来源返回的真实格式选项。
+- 封面优先选取来源可用的高分辨率缩略图，下载、校验、缩放并转成 JPEG 缓存到本机后由 Compose 显示。
+- 文件大小只采用来源提供的精确或近似大小；近似值标注「约」。缺少来源大小时显示「大小未知」，不从码率猜测文件大小。
 - 分离的视频和音频流在本机通过 FFmpeg stream copy 封装。
-- 下载完成后写入 Downloads/VideoDL，下载页保留历史并支持调用系统播放器打开。
+- 下载完成后写入 Downloads/VideoDL，应用内保留历史并支持调用系统播放器打开。
 
 ## APK 体积优化
 
@@ -21,7 +21,7 @@ Android 手机 APK 只包含 arm64-v8a，FFmpeg 使用 minimal 组件。这样�
 
 | 技术 | 实际职责 |
 |---|---|
-| Kotlin + Jetpack Compose | Android 原生 UI、格式选择、下载管理 |
+| Kotlin + Jetpack Compose + Material 3 | Android 原生 UI、格式选择、下载管理 |
 | Chaquopy + Python + yt-dlp | 手机本地媒体解析和下载 |
 | FFmpegKit minimal | 本机 MP4/MKV 音视频流复制封装 |
 | Flask + Python | 可选服务端 API，Android 无需部署 |
