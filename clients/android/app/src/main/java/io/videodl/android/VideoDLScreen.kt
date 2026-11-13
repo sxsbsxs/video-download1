@@ -538,12 +538,14 @@ private fun HomePage(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             FormatTypeChip(
+                                modifier = Modifier.weight(1f),
                                 label = "视频",
                                 count = info.videoFormats.size,
                                 selected = state.selectedFormatTab == 0,
                                 onClick = { onSelectTab(0); homeCategory = 1 }
                             )
                             FormatTypeChip(
+                                modifier = Modifier.weight(1f),
                                 label = "音乐",
                                 count = info.audioFormats.size,
                                 selected = state.selectedFormatTab == 1,
@@ -836,14 +838,15 @@ private fun Thumbnail(path: String?, modifier: Modifier = Modifier.size(112.dp, 
 
 @Composable
 private fun FormatTypeChip(
+    modifier: Modifier = Modifier,
     label: String,
     count: Int,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
-            .weight(1f)
+        modifier = modifier
+            .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         color = if (selected) SnapYellowSoft else Color(0xFFF7F7F5),
