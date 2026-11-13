@@ -200,7 +200,7 @@ object LocalYtDlpEngine {
                 }
             }
         }
-        null
+        return null
     }
 
     private fun isImage(file: File): Boolean =

@@ -237,7 +237,7 @@ private fun VideoDLApp(initialText: String) {
                 NavigationBarItem(
                     selected = selectedPage == 1,
                     onClick = { selectedPage = 1 },
-                    icon = { Icon(Icons.Filled.List, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null) },
                     label = { Text("下载") },
                     colors = navColors
                 )
@@ -471,7 +471,7 @@ private fun HomeScreen(
                     .background(VideoDLColors.blue),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(25.dp))
+                Icon(Icons.Filled.Home, contentDescription = null, tint = Color.White, modifier = Modifier.size(25.dp))
             }
             Spacer(Modifier.width(11.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
@@ -651,7 +651,7 @@ private fun HomeScreen(
                     Spacer(Modifier.width(9.dp))
                     Text("正在下载…", fontWeight = FontWeight.SemiBold)
                 } else {
-                    Icon(Icons.Filled.List, contentDescription = null)
+                    Icon(Icons.Filled.CheckCircle, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("下载到手机", fontWeight = FontWeight.SemiBold)
                 }
@@ -699,7 +699,7 @@ private fun VideoSummaryCard(info: VideoInfo) {
                     )
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color(0xFF9AA0A6), modifier = Modifier.size(42.dp))
+                        Icon(Icons.Filled.Home, contentDescription = null, tint = Color(0xFF9AA0A6), modifier = Modifier.size(42.dp))
                         Text("封面暂不可用", color = VideoDLColors.muted, style = MaterialTheme.typography.labelMedium)
                     }
                 }
@@ -809,10 +809,11 @@ private fun QualityGroupRow(
                     modifier = Modifier.height(28.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 0.dp)
                 ) {
-                    Icon(
-                        if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(17.dp)
+                    Text(
+                        if (expanded) "⌃" else "⌄",
+                        color = VideoDLColors.blue,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.width(3.dp))
                     Text(if (expanded) "收起编码选项" else "其他编码格式 ${group.options.size - 1} 个", style = MaterialTheme.typography.labelMedium)
@@ -921,7 +922,7 @@ private fun DownloadListScreen(
                         modifier = Modifier.size(68.dp).clip(CircleShape).background(VideoDLColors.blueSoft),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.List, contentDescription = null, tint = VideoDLColors.blue, modifier = Modifier.size(31.dp))
+                        Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = VideoDLColors.blue, modifier = Modifier.size(31.dp))
                     }
                     Text("还没有下载记录", color = VideoDLColors.ink, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("完成下载后，文件会显示在这里。", color = VideoDLColors.muted, style = MaterialTheme.typography.bodySmall)
@@ -996,7 +997,7 @@ private fun SettingsScreen(
             )
             Divider(color = VideoDLColors.line)
             SettingsRow(
-                icon = { Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = VideoDLColors.blue) },
+                icon = { Icon(Icons.Filled.Home, contentDescription = null, tint = VideoDLColors.blue) },
                 title = "下载引擎",
                 subtitle = "本机 Python + yt-dlp，不需要服务器或 API"
             )
@@ -1004,7 +1005,7 @@ private fun SettingsScreen(
 
         SettingsGroup(title = "存储管理") {
             SettingsRow(
-                icon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = VideoDLColors.blue) },
+                icon = { Text("×", color = VideoDLColors.blue, fontSize = 24.sp, fontWeight = FontWeight.Bold) },
                 title = "清理临时文件",
                 subtitle = "删除未完成任务的临时缓存，不影响已保存文件",
                 trailing = {
@@ -1013,7 +1014,7 @@ private fun SettingsScreen(
             )
             Divider(color = VideoDLColors.line)
             SettingsRow(
-                icon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = VideoDLColors.error) },
+                icon = { Text("×", color = VideoDLColors.error, fontSize = 24.sp, fontWeight = FontWeight.Bold) },
                 title = "清空下载列表",
                 subtitle = "只清除应用内记录，不会删除手机文件",
                 trailing = {
