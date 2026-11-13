@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import yt_dlp
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, jsonify, request, send_file
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -108,11 +108,6 @@ def public_error(exc: Exception) -> str:
     if "HTTP Error 404" in message:
         return "视频不存在或已被删除。"
     return "解析失败：请确认链接有效、内容可公开访问，并稍后重试。"
-
-
-@app.get("/")
-def index():
-    return render_template("index.html")
 
 
 @app.get("/api/health")

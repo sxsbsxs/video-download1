@@ -1,44 +1,51 @@
-# VideoDL 架构
+# VideoDL 应用架构
 
-## 单一解析引擎，多语言客户端
+## 产品方向
+
+这是应用项目，不是网站项目。用户入口是 Android、Apple 和桌面应用。Python Flask 仅暴露 JSON / 文件流 API，不提供网页、静态资源或网站首页。
 
 ~~~text
-                    +-------------------------+
-                    | Python Flask + yt-dlp   |
-                    | /api/health             |
-                    | /api/info               |
-                    | /api/download           |
-                    +------------+------------+
-                                 |
-                    HTTP JSON / file stream
-                                 |
-       +-----------+-------------+---------+---------+---------+
-       |           |             |         |         |         |
-    Browser      Android       Java      C++       Go       Rust
-    JS + TS      Kotlin UI     CLI       CLI       CLI       CLI
++-------------------+       HTTPS / JSON / file stream
+| Kotlin Android    | ------------------------------+
++-------------------+                               |
+                                                    v
++-------------------+                      +----------------------+
+| SwiftUI Apple App | --------------------> | Python Engine API    |
++-------------------+                      | yt-dlp + FFmpeg       |
+                                                    ^
++-------------------+                               |
+| C# Avalonia App   | ------------------------------+
++-------------------+
+
++-------------------+         +-----------------------------+
+| Java / C++ tools  | ------> | Rust portable task core      |
++-------------------+         | states, progress, quality    |
+                              +-----------------------------+
 ~~~
 
-## 设计原则
+## 语言职责
 
-1. yt-dlp 只在 Python 服务端运行，避免每种语言都维护一份站点解析逻辑。
-2. 客户端只负责输入、显示解析结果、选择画质和接收文件。
-3. HTTP API 是模块边界，各语言可独立升级与发布。
-4. TypeScript SDK 为 Web/Node 提供类型定义；Kotlin Android 使用系统下载目录。
-5. C++、Go、Rust、Java CLI 便于桌面、自动化与脚本集成。
+- Kotlin：Android 原生界面、输入校验、协程、系统下载目录以及后续通知/后台任务。
+- Python：站点提取器调用、视频元数据、画质选择、音视频合并及 API。
+- Rust：与 UI 无关的下载任务状态机、进度模型、质量选择规则、文件名规范化。
+- C++：后续 NDK / FFmpeg 原生媒体处理与平台库适配；当前目录保留一个 API 命令行客户端。
+- Java：JVM 自动化和兼容入口；不是 Android UI 的重复实现。
+- Swift：Apple 原生客户端。
+- C#：Avalonia 跨平台桌面客户端。
 
-## API 契约
+## 关键流程
 
-### POST /api/info
+1. 客户端将公开媒体 URL 发送到 /api/info。
+2. Python 使用 yt-dlp 读取可用信息和格式。
+3. 客户端显示标题、封面及画质选项。
+4. 客户端请求 /api/download。
+5. Python 使用 yt-dlp 与 FFmpeg 处理，并通过 HTTP 文件流返回结果。
+6. 客户端保存到系统文件位置。
 
-请求体包含 url 字段。成功响应包含 title、thumbnail、duration、uploader 和 formats。
+## 重要边界
 
-### POST /api/download
-
-请求体包含 url 和 quality 字段。成功时返回附件文件流；失败时返回带 error 字段的 JSON。
-
-## 当前边界
-
-- 解析能力取决于部署版本的 yt-dlp 与目标站点。
-- 当前 API 处理公开内容，不支持登录态、Cookie 注入或 DRM 绕过。
-- 小规模部署使用内存限流与本地临时目录；多实例部署应迁移到共享队列、共享限流存储和对象存储。
-- 下载 API 仍是同步请求；长任务进度、持久任务队列和断点续传属于后续架构升级，不应假称已经实现。
+- 当前下载任务由单个同步 API 请求承载，进度与取消尚未完整实现。
+- Rust 核心库尚未通过 JNI/FFI 接入 Kotlin；不能将其描述为已经控制真实下载。
+- Android 当前连接 Python 引擎服务；尚非单 APK 完全离线运行。
+- Python 的内存限流与临时文件仅适合小规模单实例；多实例部署还需要共享队列、共享限流和对象存储。
+- 服务端只处理公开内容，不实现 DRM 或访问控制绕过。

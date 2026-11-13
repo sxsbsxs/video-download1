@@ -23,6 +23,10 @@ class ApiTests(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
 
+    def test_root_does_not_serve_a_website(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 404)
+
     def test_health(self):
         response = self.client.get("/api/health")
         self.assertEqual(response.status_code, 200)
