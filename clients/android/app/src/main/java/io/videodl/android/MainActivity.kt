@@ -8,7 +8,6 @@ import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
@@ -22,6 +21,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -307,8 +307,8 @@ private fun VideoDLScreen(initialSharedText: String = "") {
                         prefs.edit().putString("quality", it).apply()
                     }
                 }
-                
-                        Button(
+
+                Button(
             enabled = !busy && apiBase.isNotBlank() && videoUrl.isNotBlank(),
             modifier = Modifier.fillMaxWidth(),
             onClick = {
@@ -340,7 +340,8 @@ private fun VideoDLScreen(initialSharedText: String = "") {
                     }
                 }
             }
-        ) { Text(if (busy) "处理中…" else "解析视频") }            }
+        ) { Text(if (busy) "处理中…" else "解析视频") }
+            }
         }
 
 
