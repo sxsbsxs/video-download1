@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-project(videodl_c VERSION 0.1.0 LANGUAGES C)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    project(videodl_c VERSION 0.1.0 LANGUAGES C)
+endif()
 
 include(CTest)
 find_package(CURL REQUIRED)
