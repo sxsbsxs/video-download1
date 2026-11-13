@@ -143,6 +143,29 @@ class DownloadTaskManagerTests(unittest.TestCase):
             finally:
                 manager.shutdown()
 
+    def test_recent_history_is_isolated_by_owner_token(self):
+        with tempfile.TemporaryDirectory() as temp:
+            manager = DownloadTaskManager(
+                FakeEngine(), Path(temp) / "tasks", max_workers=1, max_queue=2,
+                store_path=Path(temp) / "tasks.sqlite3",
+            )
+            try:
+                first = manager.submit("https://example.com/one", "720", owner_id="owner-a")
+                second = manager.submit("https://example.com/two", "1080", owner_id="owner-b")
+                self.wait_for_state(manager, first["id"], "completed")
+                self.wait_for_state(manager, second["id"], "completed")
+
+                self.assertEqual(
+                    [item["id"] for item in manager.list_recent(owner_id="owner-a")],
+                    [first["id"]],
+                )
+                self.assertEqual(
+                    [item["id"] for item in manager.list_recent(owner_id="owner-b")],
+                    [second["id"]],
+                )
+            finally:
+                manager.shutdown()
+
     def test_cancelled_task_is_not_exposed_as_completed(self):
         with tempfile.TemporaryDirectory() as temp:
             engine = BlockingEngine()

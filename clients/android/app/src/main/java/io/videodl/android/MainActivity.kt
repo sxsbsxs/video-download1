@@ -38,6 +38,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
@@ -65,6 +66,13 @@ private fun VideoDLScreen() {
     val scope = rememberCoroutineScope()
     val prefs = remember(context) {
         context.getSharedPreferences("videodl-client", android.content.Context.MODE_PRIVATE)
+    }
+    val ownerToken = remember(prefs) {
+        prefs.getString("ownerToken", null) ?: (
+            UUID.randomUUID().toString() + UUID.randomUUID().toString()
+        ).also { token ->
+            prefs.edit().putString("ownerToken", token).apply()
+        }
     }
     var apiBase by rememberSaveable { mutableStateOf(prefs.getString("apiBase", "") ?: "") }
     var videoUrl by rememberSaveable { mutableStateOf(prefs.getString("videoUrl", "") ?: "") }
@@ -166,6 +174,7 @@ private fun VideoDLScreen() {
                                 apiBase = apiBase,
                                 videoUrl = videoUrl,
                                 quality = quality,
+                                ownerToken = ownerToken,
                                 onTaskCreated = {
                                     activeTaskId = it
                                     prefs.edit().putString("activeTaskId", it).apply()
@@ -271,7 +280,7 @@ private fun VideoDLScreen() {
                     historyLoading = true
                     try {
                         recentTasks = withContext(Dispatchers.IO) {
-                            getRecentTasks(apiBase)
+                            getRecentTasks(apiBase, ownerToken)
                         }
                     } catch (error: Exception) {
                         status = error.message ?: "读取下载历史失败。"
@@ -390,11 +399,18 @@ private fun VideoDLScreen() {
     }
 }
 
-private fun postJson(base: String, path: String, payload: JSONObject): JSONObject {
+private fun postJson(
+    base: String,
+    path: String,
+    payload: JSONObject,
+    ownerToken: String? = null
+): JSONObject {
     val body = payload.toString().toRequestBody(
         "application/json; charset=utf-8".toMediaType()
     )
-    val request = Request.Builder().url(normalizeBase(base) + path).post(body).build()
+    val builder = Request.Builder().url(normalizeBase(base) + path).post(body)
+    ownerToken?.let { builder.header("X-VideoDL-Owner", it) }
+    val request = builder.build()
     httpClient.newCall(request).execute().use { response ->
         val text = response.body?.string().orEmpty()
         if (!response.isSuccessful) throw IOException(extractError(text, response.code))
@@ -403,8 +419,17 @@ private fun postJson(base: String, path: String, payload: JSONObject): JSONObjec
 }
 
 
-private fun getRecentTasks(base: String): List<JSONObject> {
-    val response = getJson(base, "/api/tasks?limit=20")
+private fun getRecentTasks(base: String, ownerToken: String): List<JSONObject> {
+    val request = Request.Builder()
+        .url(normalizeBase(base) + "/api/tasks?limit=20")
+        .header("X-VideoDL-Owner", ownerToken)
+        .get()
+        .build()
+    val response = httpClient.newCall(request).execute().use { response ->
+        val text = response.body?.string().orEmpty()
+        if (!response.isSuccessful) throw IOException(extractError(text, response.code))
+        JSONObject(text)
+    }
     val array = response.optJSONArray("tasks") ?: return emptyList()
     return (0 until array.length()).mapNotNull { index ->
         array.optJSONObject(index)
@@ -446,6 +471,7 @@ private suspend fun downloadWithTaskSync(
     apiBase: String,
     videoUrl: String,
     quality: String,
+    ownerToken: String,
     onTaskCreated: (String) -> Unit,
     onStatus: (String) -> Unit,
     onProgress: (Float?) -> Unit,
@@ -456,7 +482,8 @@ private suspend fun downloadWithTaskSync(
         postJson(
             apiBase,
             "/api/tasks",
-            JSONObject().put("url", videoUrl).put("quality", quality)
+            JSONObject().put("url", videoUrl).put("quality", quality),
+            ownerToken = ownerToken
         )
     }
     val taskId = created.getJSONObject("task").getString("id")

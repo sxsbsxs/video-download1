@@ -28,6 +28,34 @@ class TaskStoreTests(unittest.TestCase):
             "file_path": None,
         }
 
+    def test_existing_database_gets_owner_column_during_migration(self):
+        import sqlite3
+
+        with tempfile.TemporaryDirectory() as temp:
+            database = Path(temp) / "legacy.sqlite3"
+            connection = sqlite3.connect(database)
+            connection.execute(
+                """
+                CREATE TABLE download_tasks (
+                    id TEXT PRIMARY KEY, url TEXT NOT NULL, quality TEXT NOT NULL,
+                    state TEXT NOT NULL, downloaded_bytes INTEGER NOT NULL DEFAULT 0,
+                    total_bytes INTEGER, speed_bytes_per_second REAL, eta_seconds INTEGER,
+                    filename TEXT, size_bytes INTEGER, error TEXT,
+                    created_at REAL NOT NULL, updated_at REAL NOT NULL,
+                    work_dir TEXT, file_path TEXT
+                )
+                """
+            )
+            connection.commit()
+            connection.close()
+
+            store = TaskStore(database)
+            columns = {
+                row["name"]
+                for row in store._connect().execute("PRAGMA table_info(download_tasks)")
+            }
+            self.assertIn("owner_id", columns)
+
     def test_upsert_and_read_back_task(self):
         with tempfile.TemporaryDirectory() as temp:
             store = TaskStore(Path(temp) / "tasks.sqlite3")

@@ -52,6 +52,13 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/tasks?limit=0", headers=headers).status_code, 400)
         self.assertEqual(self.client.get("/api/tasks?limit=101", headers=headers).status_code, 400)
         self.assertEqual(self.client.get("/api/tasks?limit=nope", headers=headers).status_code, 400)
+        self.assertEqual(
+            self.client.get(
+                "/api/tasks?limit=10",
+                headers={"X-VideoDL-Owner": "too-short"},
+            ).status_code,
+            400,
+        )
         self.assertEqual(self.client.get("/api/tasks?limit=20").status_code, 401)
 
     def test_invalid_quality_rejected_before_queue(self):

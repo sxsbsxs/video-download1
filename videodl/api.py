@@ -97,10 +97,10 @@ def register_routes(app) -> None:
     @app.get("/api/tasks")
     def list_download_tasks():
         owner_id = _owner_id()
-        if not owner_id:
-            return jsonify(error="下载历史需要此设备的客户端令牌。"), 401
         if owner_id is None:
             return jsonify(error="客户端令牌格式无效。"), 400
+        if not owner_id:
+            return jsonify(error="下载历史需要此设备的客户端令牌。"), 401
         try:
             limit = int(request.args.get("limit", "20"))
         except (TypeError, ValueError):
