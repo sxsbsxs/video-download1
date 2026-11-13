@@ -14,7 +14,7 @@ This roadmap describes planned work, not already shipped functionality.
 
 - Android WorkManager integration for app-background downloads and reconnectable notifications.
 - Download history backed by local Room database.
-- Retry policy for transient network errors.
+- Add automatic retry policy for transient network errors; manual retry from failed/cancelled task history is implemented.
 - Real pause/resume and HTTP range support where the source and engine support it.
 - User-selectable output container and audio format.
 

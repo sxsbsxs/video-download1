@@ -351,7 +351,66 @@ private fun VideoDLScreen() {
                                     }
                                 }
                             ) { Text("重新保存到手机") }
-                        } else if (taskState !in listOf("failed", "cancelled") && !busy) {
+                        } else if (taskState in listOf("failed", "cancelled")) {
+                            Button(
+                                enabled = !busy,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    scope.launch {
+                                        busy = true
+                                        progressPercent = null
+                                        status = "正在重新提交下载任务…"
+                                        try {
+                                            val retriedTask = withContext(Dispatchers.IO) {
+                                                postJson(
+                                                    apiBase,
+                                                    "/api/tasks/" + taskId + "/retry",
+                                                    JSONObject(),
+                                                    ownerToken
+                                                )
+                                            }.getJSONObject("task")
+                                            val newTaskId = retriedTask.getString("id")
+                                            quality = taskQuality
+                                            prefs.edit().apply {
+                                                putString("quality", taskQuality)
+                                                putString("activeTaskId", newTaskId)
+                                            }.apply()
+                                            activeTaskId = newTaskId
+                                            val saved = waitForDownloadTask(
+                                                apiBase,
+                                                newTaskId,
+                                                { status = it },
+                                                { progressPercent = it },
+                                                {
+                                                    activeTaskId = null
+                                                    prefs.edit().remove("activeTaskId").apply()
+                                                }
+                                            ) { completedId ->
+                                                withContext(Dispatchers.IO) {
+                                                    downloadTaskToDownloads(
+                                                        context.contentResolver,
+                                                        apiBase,
+                                                        completedId,
+                                                        taskQuality
+                                                    )
+                                                }
+                                            }
+                                            status = "重试下载完成：" + saved
+                                            activeTaskId = null
+                                            prefs.edit().remove("activeTaskId").apply()
+                                            progressPercent = null
+                                            recentTasks = withContext(Dispatchers.IO) {
+                                                getRecentTasks(apiBase, ownerToken)
+                                            }
+                                        } catch (error: Exception) {
+                                            status = error.message ?: "重新下载失败。"
+                                        } finally {
+                                            busy = false
+                                        }
+                                    }
+                                }
+                            ) { Text("重新下载") }
+                        } else if (!busy) {
                             Button(
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = {
