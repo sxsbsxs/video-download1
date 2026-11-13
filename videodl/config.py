@@ -8,6 +8,7 @@ from pathlib import Path
 @dataclass(frozen=True)
 class Settings:
     download_dir: Path
+    task_db_path: Path
     max_duration_seconds: int = 7200
     max_file_mb: int = 1024
     max_concurrent_downloads: int = 2
@@ -21,6 +22,7 @@ class Settings:
     def from_env(cls) -> "Settings":
         return cls(
             download_dir=Path(os.getenv("DOWNLOAD_DIR", "/tmp/videodl")),
+            task_db_path=Path(os.getenv("TASK_DB_PATH", "/tmp/videodl/tasks.sqlite3")),
             max_duration_seconds=_positive_int("MAX_DURATION_SECONDS", 7200),
             max_file_mb=_positive_int("MAX_FILE_MB", 1024),
             max_concurrent_downloads=_positive_int("MAX_CONCURRENT_DOWNLOADS", 2),
@@ -34,6 +36,7 @@ class Settings:
     def with_overrides(self, values: dict) -> "Settings":
         mapping = {
             "DOWNLOAD_DIR": "download_dir",
+            "TASK_DB_PATH": "task_db_path",
             "MAX_DURATION_SECONDS": "max_duration_seconds",
             "MAX_FILE_MB": "max_file_mb",
             "MAX_CONCURRENT_DOWNLOADS": "max_concurrent_downloads",
@@ -49,6 +52,8 @@ class Settings:
                 updates[internal] = values[external]
         if "download_dir" in updates:
             updates["download_dir"] = Path(updates["download_dir"])
+        if "task_db_path" in updates:
+            updates["task_db_path"] = Path(updates["task_db_path"])
         updated = Settings(**{**self.__dict__, **updates})
         if updated.max_duration_seconds <= 0 or updated.max_file_mb <= 0:
             raise ValueError("视频时长和文件大小限制必须大于 0。")

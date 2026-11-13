@@ -28,6 +28,7 @@ def create_app(config: dict | None = None, engine=None, task_manager=None) -> Fl
         max_workers=settings.max_concurrent_downloads,
         max_queue=settings.task_queue_size,
         retention_seconds=settings.task_retention_seconds,
+        store_path=settings.task_db_path,
     )
 
     app.extensions["videodl.engine"] = engine

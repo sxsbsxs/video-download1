@@ -4,7 +4,8 @@ import time
 import unittest
 from pathlib import Path
 
-from videodl.tasks import DownloadTaskManager
+from videodl.task_store import TaskStore
+from videodl.tasks import DownloadTaskManager, INTERRUPTED_TASK_ERROR
 
 
 class FakeEngine:
@@ -58,8 +59,10 @@ class DownloadTaskManagerTests(unittest.TestCase):
 
     def test_task_progress_completion_and_file(self):
         with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
             manager = DownloadTaskManager(
-                FakeEngine(), Path(temp), max_workers=1, max_queue=1
+                FakeEngine(), root / "tasks", max_workers=1, max_queue=1,
+                store_path=root / "tasks.sqlite3",
             )
             try:
                 task = manager.submit("https://example.com/video", "720")
@@ -72,11 +75,79 @@ class DownloadTaskManagerTests(unittest.TestCase):
             finally:
                 manager.shutdown()
 
+    def test_completed_task_and_file_survive_manager_restart(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            db_path = root / "tasks.sqlite3"
+            download_root = root / "tasks"
+
+            first = DownloadTaskManager(
+                FakeEngine(), download_root, max_workers=1, max_queue=1,
+                store_path=db_path,
+            )
+            task = first.submit("https://example.com/video", "720")
+            self.wait_for_state(first, task["id"], "completed")
+            first.shutdown()
+
+            restored = DownloadTaskManager(
+                FakeEngine(), download_root, max_workers=1, max_queue=1,
+                store_path=db_path,
+            )
+            try:
+                status = restored.get(task["id"])
+                self.assertEqual(status["state"], "completed")
+                path, name = restored.get_file(task["id"])
+                self.assertEqual(name, "test-video.mp4")
+                self.assertEqual(path.read_bytes(), b"video-bytes")
+            finally:
+                restored.shutdown()
+
+    def test_inflight_task_is_recovered_as_failed_not_stuck_running(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            db_path = root / "tasks.sqlite3"
+            work_dir = root / "tasks" / "interrupted-task"
+            work_dir.mkdir(parents=True)
+            (work_dir / "partial.mp4.part").write_bytes(b"partial")
+
+            store = TaskStore(db_path)
+            now = time.time()
+            store.save({
+                "id": "interrupted-task",
+                "url": "https://example.com/video",
+                "quality": "best",
+                "state": "downloading",
+                "downloaded_bytes": 1250,
+                "total_bytes": 5000,
+                "speed_bytes_per_second": 256.0,
+                "eta_seconds": 15,
+                "filename": None,
+                "size_bytes": None,
+                "error": None,
+                "created_at": now - 20,
+                "updated_at": now,
+                "work_dir": str(work_dir),
+                "file_path": None,
+            })
+
+            manager = DownloadTaskManager(
+                FakeEngine(), root / "tasks", max_workers=1, max_queue=1,
+                store_path=db_path,
+            )
+            try:
+                recovered = manager.get("interrupted-task")
+                self.assertEqual(recovered["state"], "failed")
+                self.assertEqual(recovered["error"], INTERRUPTED_TASK_ERROR)
+                self.assertFalse(work_dir.exists())
+            finally:
+                manager.shutdown()
+
     def test_cancelled_task_is_not_exposed_as_completed(self):
         with tempfile.TemporaryDirectory() as temp:
             engine = BlockingEngine()
             manager = DownloadTaskManager(
-                engine, Path(temp), max_workers=1, max_queue=1
+                engine, Path(temp) / "tasks", max_workers=1, max_queue=1,
+                store_path=Path(temp) / "tasks.sqlite3",
             )
             try:
                 task = manager.submit("https://example.com/video", "best")
