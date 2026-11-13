@@ -140,6 +140,7 @@ fun VideoDLApp(
     onDownload: (String) -> Unit,
     onPageChange: (Int) -> Unit,
     onOpenDownload: (Int) -> Unit,
+    onOpenSource: (String) -> Unit,
     onClearHistory: () -> Unit,
     onClearTemp: () -> Unit
 ) {
@@ -218,7 +219,8 @@ fun VideoDLApp(
                     onSelectTab = onSelectTab,
                     onSelectFormat = onSelectFormat,
                     onDownload = onDownload,
-                    onOpenFiles = { onPageChange(1) }
+                    onOpenFiles = { onPageChange(1) },
+                    onOpenSource = onOpenSource
                 )
             }
         }
@@ -235,83 +237,93 @@ private fun HomePage(
     onSelectTab: (Int) -> Unit,
     onSelectFormat: (String) -> Unit,
     onDownload: (String) -> Unit,
-    onOpenFiles: () -> Unit
+    onOpenFiles: () -> Unit,
+    onOpenSource: (String) -> Unit
 ) {
     var showFormatSheet by remember { mutableStateOf(false) }
     var homeCategory by remember { mutableStateOf(0) }
     val info = state.mediaInfo
     val allFormats = info?.videoFormats.orEmpty() + info?.audioFormats.orEmpty()
     val selectedFormat = allFormats.firstOrNull { it.key == state.selectedFormatKey }
+    val platforms = listOf(
+        PlatformShortcut("YouTube", "▶", "https://www.youtube.com", Color(0xFFE53935)),
+        PlatformShortcut("Facebook", "f", "https://www.facebook.com", Color(0xFF1877F2)),
+        PlatformShortcut("Instagram", "◎", "https://www.instagram.com", Color(0xFFD94382)),
+        PlatformShortcut("TikTok", "♪", "https://www.tiktok.com", Color(0xFF171717)),
+        PlatformShortcut("Bilibili", "B站", "https://www.bilibili.com", Color(0xFF18A6D9)),
+        PlatformShortcut("X", "𝕏", "https://x.com", Color(0xFF171717)),
+        PlatformShortcut("Nico", "N", "https://www.nicovideo.jp", Color(0xFF4B70BA)),
+        PlatformShortcut("Vimeo", "v", "https://vimeo.com", Color(0xFF1AB7EA)),
+        PlatformShortcut("SoundCloud", "≋", "https://soundcloud.com", Color(0xFFFF6A24)),
+        PlatformShortcut("Dailymotion", "D", "https://www.dailymotion.com", Color(0xFF4168E8))
+    )
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .background(PageBackground)
     ) {
-        // SnapTube-inspired yellow masthead with a persistent URL search field.
+        // SnapTube-style compact yellow masthead: brand row + one integrated search bar.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(SnapYellow)
-                .padding(start = 18.dp, end = 18.dp, top = 17.dp, bottom = 19.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 13.dp)
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    modifier = Modifier.size(40.dp),
-                    shape = RoundedCornerShape(13.dp),
+                    modifier = Modifier.size(35.dp),
+                    shape = CircleShape,
                     color = Color.White
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Default.Download,
                             contentDescription = null,
-                            tint = PrimaryText,
-                            modifier = Modifier.size(25.dp)
+                            tint = Color(0xFFE84A32),
+                            modifier = Modifier.size(23.dp)
                         )
                     }
                 }
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "VideoDL",
-                        fontSize = 21.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = PrimaryText,
-                        letterSpacing = (-0.7).sp
-                    )
-                    Text(
-                        "视频与音乐下载",
-                        fontSize = 11.sp,
-                        color = Color(0xFF4C3E12)
-                    )
-                }
+                Spacer(Modifier.width(9.dp))
+                Text(
+                    "VideoDL",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = (-0.8).sp,
+                    color = PrimaryText
+                )
+                Spacer(Modifier.weight(1f))
                 Surface(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clickable(onClick = onOpenFiles),
                     shape = CircleShape,
-                    color = Color(0x33FFFFFF),
-                    modifier = Modifier.size(39.dp)
+                    color = Color(0x33FFFFFF)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             Icons.Default.FolderOpen,
                             contentDescription = "我的文件",
                             tint = PrimaryText,
-                            modifier = Modifier
-                                .size(21.dp)
-                                .clickable(onClick = onOpenFiles)
+                            modifier = Modifier.size(21.dp)
                         )
                     }
                 }
             }
 
-            Spacer(Modifier.height(17.dp))
+            Spacer(Modifier.height(9.dp))
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(17.dp),
-                color = CardWhite,
-                shadowElevation = 2.dp
+                color = Color.White,
+                shape = RoundedCornerShape(28.dp),
+                shadowElevation = 1.dp
             ) {
                 OutlinedTextField(
                     value = state.input,
@@ -322,86 +334,91 @@ private fun HomePage(
                     placeholder = {
                         Text(
                             "搜索或粘贴视频链接",
-                            color = Color(0xFF929292),
-                            fontSize = 14.sp
+                            color = Color(0xFF8D8D8D),
+                            fontSize = 13.sp
                         )
                     },
                     leadingIcon = {
                         Icon(
                             Icons.Default.Search,
                             contentDescription = null,
-                            tint = SecondaryText
+                            tint = Color(0xFF666666),
+                            modifier = Modifier.size(21.dp)
                         )
                     },
                     trailingIcon = {
-                        TextButton(
-                            onClick = onPaste,
-                            enabled = !state.analyzing && !state.downloading
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            Icon(
-                                Icons.Default.ContentPaste,
-                                contentDescription = null,
-                                modifier = Modifier.size(17.dp),
-                                tint = PrimaryText
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text("粘贴", color = PrimaryText, fontWeight = FontWeight.SemiBold)
+                            TextButton(
+                                onClick = onPaste,
+                                enabled = !state.analyzing && !state.downloading
+                            ) {
+                                Icon(
+                                    Icons.Default.ContentPaste,
+                                    contentDescription = null,
+                                    tint = Color(0xFF555555),
+                                    modifier = Modifier.size(17.dp)
+                                )
+                                Spacer(Modifier.width(3.dp))
+                                Text("粘贴", color = Color(0xFF555555), fontSize = 12.sp)
+                            }
+                            Surface(
+                                modifier = Modifier
+                                    .padding(end = 6.dp)
+                                    .size(34.dp)
+                                    .clickable(
+                                        enabled = state.input.isNotBlank() && !state.analyzing && !state.downloading,
+                                        onClick = onAnalyze
+                                    ),
+                                shape = CircleShape,
+                                color = if (state.input.isNotBlank() && !state.analyzing && !state.downloading) SnapYellow else Color(0xFFECECEC)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (state.analyzing) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(17.dp),
+                                            strokeWidth = 2.dp,
+                                            color = PrimaryText
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Default.ArrowForward,
+                                            contentDescription = "解析链接",
+                                            tint = PrimaryText,
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     },
-                    shape = RoundedCornerShape(17.dp),
+                    shape = RoundedCornerShape(28.dp),
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.Transparent,
                         unfocusedBorderColor = Color.Transparent,
-                        focusedContainerColor = CardWhite,
-                        unfocusedContainerColor = CardWhite,
-                        disabledContainerColor = CardWhite
+                        disabledBorderColor = Color.Transparent,
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        disabledContainerColor = Color.White
                     )
                 )
-            }
-            Spacer(Modifier.height(10.dp))
-            Button(
-                onClick = onAnalyze,
-                enabled = state.input.isNotBlank() && !state.analyzing && !state.downloading,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryText,
-                    contentColor = SnapYellow,
-                    disabledContainerColor = Color(0xFF786A38),
-                    disabledContentColor = Color(0xFFFFEAA1)
-                )
-            ) {
-                if (state.analyzing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = SnapYellow,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(Modifier.width(9.dp))
-                    Text("正在解析…", fontWeight = FontWeight.Bold)
-                } else {
-                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(7.dp))
-                    Text("解析链接", fontWeight = FontWeight.Bold)
-                }
             }
         }
 
-        // Functional category strip: it changes the actual video/audio format category.
+        // Channel strip mirrors the real app's compact horizontal category navigation.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(CardWhite)
+                .background(Color.White)
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+                .padding(horizontal = 17.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(25.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            HomeCategory("全部", homeCategory == 0) {
+            HomeCategory("首页", homeCategory == 0) {
                 homeCategory = 0
-                onSelectTab(0)
             }
             HomeCategory("视频", homeCategory == 1) {
                 homeCategory = 1
@@ -411,79 +428,65 @@ private fun HomePage(
                 homeCategory = 2
                 onSelectTab(1)
             }
-            HomeCategory("下载记录", false, onOpenFiles)
+            HomeCategory("网站", homeCategory == 3) {
+                homeCategory = 3
+            }
+            HomeCategory("最近", false, onOpenFiles)
         }
 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 17.dp)
+                .padding(horizontal = 16.dp)
         ) {
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(16.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "快速入口",
-                    fontSize = 18.sp,
+                    "常用网站",
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = PrimaryText
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "本机解析引擎",
-                    fontSize = 11.sp,
+                    "打开后分享视频到 VideoDL",
+                    fontSize = 10.sp,
                     color = SecondaryText
                 )
             }
-            Spacer(Modifier.height(11.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(9.dp)
-            ) {
-                QuickEntry(
-                    modifier = Modifier.weight(1f),
-                    icon = { Icon(Icons.Default.ContentPaste, contentDescription = null) },
-                    title = "粘贴链接",
-                    subtitle = "剪贴板",
-                    onClick = onPaste
-                )
-                QuickEntry(
-                    modifier = Modifier.weight(1f),
-                    icon = { Icon(Icons.Default.Movie, contentDescription = null) },
-                    title = "视频下载",
-                    subtitle = "选择画质",
-                    onClick = { homeCategory = 1; onSelectTab(0) }
-                )
-                QuickEntry(
-                    modifier = Modifier.weight(1f),
-                    icon = { Icon(Icons.Default.AudioFile, contentDescription = null) },
-                    title = "音乐提取",
-                    subtitle = "仅下载音频",
-                    onClick = { homeCategory = 2; onSelectTab(1) }
-                )
+            Spacer(Modifier.height(12.dp))
+            platforms.chunked(5).forEach { line ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    line.forEach { platform ->
+                        SourceShortcut(
+                            platform = platform,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onOpenSource(platform.url) }
+                        )
+                    }
+                    repeat(5 - line.size) { Spacer(Modifier.weight(1f)) }
+                }
+                Spacer(Modifier.height(13.dp))
             }
 
             if (state.errorText.isNotBlank()) {
-                Spacer(Modifier.height(15.dp))
-                MessageCard(
-                    text = state.errorText,
-                    isError = true
-                )
+                Spacer(Modifier.height(3.dp))
+                MessageCard(text = state.errorText, isError = true)
             }
 
             if (info != null) {
-                Spacer(Modifier.height(22.dp))
+                Spacer(Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        "解析结果",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("解析结果", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.weight(1f))
                     Surface(
                         color = Color(0xFFE7F4EA),
@@ -504,35 +507,30 @@ private fun HomePage(
                         }
                     }
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(9.dp))
                 VideoResultCard(info = info)
-
-                Spacer(Modifier.height(14.dp))
+                Spacer(Modifier.height(12.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(17.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = CardWhite),
                     border = BorderStroke(1.dp, Hairline),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
-                    Column(Modifier.padding(15.dp)) {
+                    Column(Modifier.padding(14.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("下载格式", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                Text(
-                                    "根据来源实际提供的格式选择",
-                                    fontSize = 11.sp,
-                                    color = SecondaryText
-                                )
+                                Text("仅显示来源实际提供的格式", fontSize = 11.sp, color = SecondaryText)
                             }
                             TextButton(onClick = { showFormatSheet = true }) {
-                                Text("全部格式", color = Color(0xFF9A7400), fontWeight = FontWeight.Bold)
+                                Text("全部格式", color = Color(0xFF987400), fontWeight = FontWeight.Bold)
                             }
                         }
-                        Spacer(Modifier.height(7.dp))
+                        Spacer(Modifier.height(6.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -552,7 +550,7 @@ private fun HomePage(
                                 onClick = { onSelectTab(1); homeCategory = 2 }
                             )
                         }
-                        Spacer(Modifier.height(11.dp))
+                        Spacer(Modifier.height(10.dp))
                         if (selectedFormat != null) {
                             SelectedFormatSummary(selectedFormat)
                         } else {
@@ -563,14 +561,12 @@ private fun HomePage(
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(11.dp))
                         Button(
                             onClick = { onDownload(state.selectedFormatKey) },
                             enabled = selectedFormat != null && !state.downloading && !state.analyzing,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp),
-                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth().height(49.dp),
+                            shape = RoundedCornerShape(13.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = SnapYellow,
                                 contentColor = PrimaryText
@@ -593,62 +589,62 @@ private fun HomePage(
                     }
                 }
                 if (state.downloading || state.progress == 100f) {
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(12.dp))
                     TransferStatus(state.statusText, state.progress)
                 }
             } else {
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(6.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
-                    color = CardWhite,
+                    shape = RoundedCornerShape(17.dp),
+                    color = Color.White,
                     border = BorderStroke(1.dp, Hairline)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(vertical = 25.dp, horizontal = 19.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Row(
+                        modifier = Modifier.padding(horizontal = 15.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Surface(
-                            modifier = Modifier.size(62.dp),
+                            modifier = Modifier.size(46.dp),
                             shape = CircleShape,
                             color = SnapYellowSoft
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    Icons.Default.Link,
+                                    Icons.Default.ContentPaste,
                                     contentDescription = null,
                                     tint = Color(0xFF806400),
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "粘贴链接，开始下载",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                        Spacer(Modifier.height(5.dp))
-                        Text(
-                            "支持视频与音频格式选择，解析和下载都在本机完成。",
-                            color = SecondaryText,
-                            fontSize = 12.sp,
-                            lineHeight = 18.sp
-                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("粘贴视频链接即可开始", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                "解析、画质选择和下载都在本机完成",
+                                color = SecondaryText,
+                                fontSize = 11.sp
+                            )
+                        }
+                        TextButton(onClick = onPaste) {
+                            Text("粘贴", color = Color(0xFF987400), fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
 
             if (state.history.isNotEmpty()) {
-                Spacer(Modifier.height(22.dp))
+                Spacer(Modifier.height(19.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("最近下载", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("最近下载", fontSize = 17.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = onOpenFiles) {
-                        Text("查看全部", color = Color(0xFF9A7400))
+                        Text("查看全部", color = Color(0xFF987400))
                     }
                 }
                 state.history.take(3).forEach { item ->
@@ -656,7 +652,7 @@ private fun HomePage(
                     Spacer(Modifier.height(8.dp))
                 }
             }
-            Spacer(Modifier.height(25.dp))
+            Spacer(Modifier.height(22.dp))
         }
     }
 
@@ -684,6 +680,50 @@ private fun HomePage(
                 }
             )
         }
+    }
+}
+
+private data class PlatformShortcut(
+    val label: String,
+    val mark: String,
+    val url: String,
+    val accent: Color
+)
+
+@Composable
+private fun SourceShortcut(
+    platform: PlatformShortcut,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            modifier = Modifier.size(43.dp),
+            shape = CircleShape,
+            color = platform.accent
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    platform.mark,
+                    color = Color.White,
+                    fontSize = if (platform.mark.length > 1) 13.sp else 21.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            platform.label,
+            color = Color(0xFF444444),
+            fontSize = 9.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
