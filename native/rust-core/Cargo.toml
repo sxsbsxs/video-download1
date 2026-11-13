@@ -1,0 +1,10 @@
+[package]
+name = "videodl-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Portable task and download policy core for VideoDL"
+
+[lib]
+name = "videodl_core"
+path = "src/lib.rs"

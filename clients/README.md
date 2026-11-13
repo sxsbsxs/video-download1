@@ -6,6 +6,25 @@
 
 使用 Android Studio 打开 clients/android。应用可解析视频信息、查看封面和画质，并将文件保存到 Downloads/VideoDL。
 
+## Apple macOS（SwiftUI）
+
+需要 macOS 13+ 和 Swift 5.9+：
+
+~~~bash
+swift build --package-path clients/apple
+swift run --package-path clients/apple
+~~~
+
+## 桌面（C# / Avalonia）
+
+需要 .NET 8：
+
+~~~bash
+dotnet run --project clients/desktop/VideoDL.Desktop.csproj
+~~~
+
+Avalonia 可在 Windows、Linux 和 macOS 桌面环境构建。
+
 ## Java
 
 需要 JDK 17+ 和 Gradle：
@@ -35,10 +54,16 @@ cargo run -- http://127.0.0.1:8080 info "https://example.com/video"
 cargo run -- http://127.0.0.1:8080 download "https://example.com/video" best output.mp4
 ~~~
 
-Rust 核心库会放在 native/rust-core，提供跨平台的任务状态、进度和画质规则。
+## Rust 核心库
+
+`native/rust-core` 提供任务状态转换、进度计算、画质规则和安全文件名处理。当前是可复用核心模块，尚未通过 JNI/FFI 接入 Android 主应用。
+
+~~~bash
+cargo test --manifest-path native/rust-core/Cargo.toml
+~~~
 
 ## 约束
 
 - 不要在客户端硬编码服务器密钥、Cookie 或用户凭据。
 - 仅下载你有权保存的内容。
-- Android 客户端当前依赖远程/本地 API 引擎，不是离线内嵌 yt-dlp。
+- Android 客户端当前依赖 API 引擎，不是离线内嵌 yt-dlp。

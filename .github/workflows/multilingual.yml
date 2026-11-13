@@ -1,72 +1,28 @@
-name: Multi-language clients
+name: Application build matrix
 
 on:
   push:
     branches: [main]
     paths:
+      - "app.py"
       - "clients/**"
+      - "native/**"
+      - "docs/**"
+      - "README.md"
+      - "Dockerfile"
       - ".github/workflows/multilingual.yml"
   pull_request:
     branches: [main]
     paths:
+      - "app.py"
       - "clients/**"
+      - "native/**"
+      - "docs/**"
+      - "README.md"
+      - "Dockerfile"
       - ".github/workflows/multilingual.yml"
 
 jobs:
-  typescript:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - run: npm install --prefix clients/typescript
-      - run: npm run build --prefix clients/typescript
-
-  go:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.23"
-      - working-directory: clients/go
-        run: go test ./...
-      - working-directory: clients/go
-        run: go build ./...
-
-  rust:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - working-directory: clients/rust
-        run: cargo test
-
-  cpp:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install C++ dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake g++ libcurl4-openssl-dev nlohmann-json3-dev
-      - run: cmake -S clients/cpp -B build/cpp -DCMAKE_BUILD_TYPE=Release
-      - run: cmake --build build/cpp --config Release
-
-  java:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.10"
-      - run: gradle -p clients/java test build
-
   android:
     runs-on: ubuntu-latest
     steps:
@@ -86,3 +42,54 @@ jobs:
           name: VideoDL-Android-debug
           path: clients/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
+
+  java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10"
+      - run: gradle -p clients/java test build
+
+  cpp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install C++ dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libcurl4-openssl-dev nlohmann-json3-dev
+      - run: cmake -S clients/cpp -B build/cpp -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build/cpp --config Release
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - working-directory: clients/rust
+        run: cargo test
+      - working-directory: native/rust-core
+        run: cargo test
+
+  swift:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Apple SwiftUI app
+        run: swift build --package-path clients/apple
+
+  csharp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build Avalonia desktop app
+        run: dotnet build clients/desktop/VideoDL.Desktop.csproj --configuration Release

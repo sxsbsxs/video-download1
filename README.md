@@ -24,9 +24,9 @@ VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工�
 | 保存到 Android Downloads/VideoDL | 已接入 |
 | JVM Java 客户端 | 有基础命令行客户端 |
 | C++ 客户端 | 有基础命令行客户端 |
-| Rust 任务核心 | 正在加入跨平台核心基础模块 |
-| Apple Swift 应用 | 规划为原生 Apple 客户端 |
-| C# 桌面应用 | 规划为 Avalonia 桌面客户端 |
+| Rust 任务核心 | 已有跨平台任务/进度模型和单元测试 |
+| Apple Swift 应用 | 已有 macOS SwiftUI 客户端源码 |
+| C# 桌面应用 | 已有 Avalonia 桌面客户端源码 |
 | 后台持续下载、真实进度、断点续传 | 尚未完成 |
 | 本地离线 yt-dlp 引擎 | 尚未完成；目前 Android 依赖 API 服务 |
 
@@ -53,11 +53,15 @@ VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工�
 ├── Dockerfile                     # 仅用于运行引擎 API
 ├── clients/
 │   ├── android/                   # Kotlin + Jetpack Compose
+│   ├── apple/                     # SwiftUI macOS 应用
+│   ├── desktop/                   # C# + Avalonia
 │   ├── java/                      # Java JVM 客户端
 │   ├── cpp/                       # C++ 客户端/原生集成入口
 │   └── rust/                      # Rust 客户端
 ├── native/
 │   └── rust-core/                 # 可复用的任务状态与质量规则核心
+├── native/
+│   └── rust-core/                 # Rust 任务核心
 ├── docs/
 │   └── ARCHITECTURE.md
 └── tests/
@@ -93,6 +97,23 @@ python app.py
 使用 Android Studio 打开 `clients/android`，运行 app 模块。应用中填写引擎 API 地址和公开视频链接，解析后选择画质并保存到系统 Downloads/VideoDL。
 
 远程引擎必须使用 HTTPS。当前 Android 客户端是应用界面，yt-dlp 仍在 API 服务运行，并非完全离线版本。
+
+## Apple 应用（SwiftUI）
+
+在 macOS 上运行：
+
+~~~bash
+swift build --package-path clients/apple
+swift run --package-path clients/apple
+~~~
+
+## 桌面应用（C# / Avalonia）
+
+需要 .NET 8 SDK：
+
+~~~bash
+dotnet run --project clients/desktop/VideoDL.Desktop.csproj
+~~~
 
 ## Java / C++ / Rust 工具
 
