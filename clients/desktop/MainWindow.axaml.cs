@@ -10,13 +10,8 @@ namespace VideoDL.Desktop;
 public partial class MainWindow : Window
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(30) };
-    private TextBox ApiBaseBox => this.FindControl<TextBox>("ApiBaseBox")!;
-    private TextBox VideoUrlBox => this.FindControl<TextBox>("VideoUrlBox")!;
-    private TextBox QualityBox => this.FindControl<TextBox>("QualityBox")!;
-    private TextBlock TitleText => this.FindControl<TextBlock>("TitleText")!;
-    private TextBlock UploaderText => this.FindControl<TextBlock>("UploaderText")!;
-    private TextBlock FormatsText => this.FindControl<TextBlock>("FormatsText")!;
-    private TextBlock StatusText => this.FindControl<TextBlock>("StatusText")!;
+    private TextBox Input(string name) => this.FindControl<TextBox>(name)!;
+    private TextBlock Label(string name) => this.FindControl<TextBlock>(name)!;
 
     public MainWindow() => InitializeComponent();
 
@@ -24,7 +19,7 @@ public partial class MainWindow : Window
 
     private string ApiBase()
     {
-        var value = ApiBaseBox.Text?.Trim().TrimEnd('/') ?? "";
+        var value = Input("ApiBaseBox").Text?.Trim().TrimEnd('/') ?? "";
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttps && !uri.IsLoopback && uri.Host != "localhost"))
         {
@@ -35,7 +30,7 @@ public partial class MainWindow : Window
 
     private string VideoUrl()
     {
-        var value = VideoUrlBox.Text?.Trim() ?? "";
+        var value = Input("VideoUrlBox").Text?.Trim() ?? "";
         if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
         {
@@ -48,24 +43,24 @@ public partial class MainWindow : Window
     {
         try
         {
-            StatusText.Text = "正在解析…";
+            Label("StatusText").Text = "正在解析…";
             using var response = await Http.PostAsJsonAsync(ApiBase() + "/api/info", new { url = VideoUrl() });
             var body = await response.Content.ReadAsStringAsync();
             EnsureSuccess(response, body);
             using var json = JsonDocument.Parse(body);
             var root = json.RootElement;
-            TitleText.Text = root.TryGetProperty("title", out var title) ? title.GetString() ?? "未命名视频" : "未命名视频";
-            UploaderText.Text = root.TryGetProperty("uploader", out var uploader) ? uploader.GetString() ?? "" : "";
+            Label("TitleText").Text = root.TryGetProperty("title", out var title) ? title.GetString() ?? "未命名视频" : "未命名视频";
+            Label("UploaderText").Text = root.TryGetProperty("uploader", out var uploader) ? uploader.GetString() ?? "" : "";
             var labels = root.TryGetProperty("formats", out var formats)
                 ? formats.EnumerateArray().Select(f => f.TryGetProperty("label", out var label) ? label.GetString() : null)
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                 : Enumerable.Empty<string?>();
-            FormatsText.Text = "可用画质：" + string.Join("、", labels);
-            StatusText.Text = "解析完成。";
+            Label("FormatsText").Text = "可用画质：" + string.Join("、", labels);
+            Label("StatusText").Text = "解析完成。";
         }
         catch (Exception ex)
         {
-            StatusText.Text = ex.Message;
+            Label("StatusText").Text = ex.Message;
         }
     }
 
@@ -73,8 +68,8 @@ public partial class MainWindow : Window
     {
         try
         {
-            var quality = string.IsNullOrWhiteSpace(QualityBox.Text) ? "best" : QualityBox.Text.Trim();
-            StatusText.Text = "正在请求下载…";
+            var quality = string.IsNullOrWhiteSpace(Input("QualityBox").Text) ? "best" : Input("QualityBox").Text.Trim();
+            Label("StatusText").Text = "正在请求下载…";
             using var request = new HttpRequestMessage(HttpMethod.Post, ApiBase() + "/api/download")
             {
                 Content = JsonContent.Create(new { url = VideoUrl(), quality })
@@ -94,18 +89,18 @@ public partial class MainWindow : Window
             });
             if (file is null)
             {
-                StatusText.Text = "已取消保存。";
+                Label("StatusText").Text = "已取消保存。";
                 return;
             }
 
             await using var source = await response.Content.ReadAsStreamAsync();
             await using var target = await file.OpenWriteAsync();
             await source.CopyToAsync(target);
-            StatusText.Text = "下载完成：" + file.Name;
+            Label("StatusText").Text = "下载完成：" + file.Name;
         }
         catch (Exception ex)
         {
-            StatusText.Text = ex.Message;
+            Label("StatusText").Text = ex.Message;
         }
     }
 
