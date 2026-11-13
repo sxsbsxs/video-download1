@@ -77,13 +77,13 @@ def _format_dimensions(fmt):
             continue
 
         if width <= 0 or height <= 0:
-            match = re.search(r"(?<!\\d)(\\d{3,5})\\s*[x×]\\s*(\\d{3,5})(?!\\d)", value, re.IGNORECASE)
+            match = re.search(r"(?<!\d)(\d{3,5})\s*[x×]\s*(\d{3,5})(?!\d)", value, re.IGNORECASE)
             if match:
                 width = width or int(match.group(1))
                 height = height or int(match.group(2))
 
         if height <= 0:
-            match = re.search(r"(?<!\\d)(\\d{3,4})p(?!\\d)", value, re.IGNORECASE)
+            match = re.search(r"(?<!\d)(\d{3,4})p(?!\d)", value, re.IGNORECASE)
             if match:
                 height = int(match.group(1))
 
