@@ -13,6 +13,7 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -150,7 +151,7 @@ object LocalYtDlpEngine {
             val digest = MessageDigest.getInstance("SHA-256")
                 .digest(thumbnailUrl.toByteArray())
                 .joinToString("") { "%02x".format(it) }
-            val target = File(directory, "$digest.img")
+            val target = File(directory, "$digest.jpg")
             if (target.isFile && target.length() > 0L && isImage(target)) return target
 
             for (useReferer in listOf(true, false)) {
@@ -184,9 +185,8 @@ object LocalYtDlpEngine {
                         }
                         output.toByteArray()
                     }
-                    if (!isImage(bytes)) continue
+                    if (!writeThumbnailJpeg(bytes, File(directory, "$digest.tmp"))) continue
                     val temporary = File(directory, "$digest.tmp")
-                    temporary.writeBytes(bytes)
                     if (target.exists()) target.delete()
                     if (!temporary.renameTo(target)) {
                         temporary.delete()
@@ -201,6 +201,33 @@ object LocalYtDlpEngine {
             }
         }
         return null
+    }
+
+
+    private fun writeThumbnailJpeg(bytes: ByteArray, target: File): Boolean {
+        if (bytes.isEmpty()) return false
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return false
+
+        // Covers are rendered in a 16:9 preview; downsample very large originals
+        // before decoding so a high-resolution source thumbnail cannot exhaust RAM.
+        var sampleSize = 1
+        while (bounds.outWidth / sampleSize > 1600 || bounds.outHeight / sampleSize > 1200) {
+            sampleSize *= 2
+        }
+        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return false
+        return try {
+            FileOutputStream(target).use { output ->
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, output)
+            }
+        } catch (_: Exception) {
+            target.delete()
+            false
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private fun isImage(file: File): Boolean =

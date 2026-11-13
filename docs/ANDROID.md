@@ -13,8 +13,8 @@ The Android app runs its downloader on the phone. It does not ask the user for a
 - Kotlin + Jetpack Compose provides the interface and writes completed files to Downloads/VideoDL.
 - Chaquopy embeds CPython 3.13; yt-dlp extracts metadata and the exact format list returned by the source website.
 - The format picker does not invent fixed quality tiers. It displays actual width, height, frame rate, dynamic range, codecs, container and format ID.
-- File sizes are never silently presented as exact when only bitrate or approximate source metadata is available. The UI prefixes these values with "约"; a bitrate estimate uses duration and the source-reported bitrate. If it cannot be calculated reliably, the UI shows "大小未知".
-- Thumbnail candidates are collected from yt-dlp, sorted by available pixel dimensions, and downloaded into a local image cache with a source Referer and User-Agent fallback. The UI then loads a local validated image file rather than relying on the image host to permit Coil's direct request.
+- File sizes use only source-reported filesize or filesize_approx values. Approximate source values are prefixed with "约". If either a separate video or audio stream has no source size, the combined file size is shown as "大小未知"; bitrate is never converted into a guessed file size.
+- Thumbnail candidates are collected from yt-dlp, sorted by available pixel dimensions, and downloaded into a local image cache with a source Referer and User-Agent fallback. The app validates and downsamples the image, re-encodes it as a local JPEG, and loads that file instead of relying on the image host to permit Coil's direct request.
 - When video and audio streams are separate, the app performs stream-copy remuxing locally.
 
 ## App size

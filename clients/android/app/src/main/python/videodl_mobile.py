@@ -66,8 +66,8 @@ def extract_video_url(raw: str) -> str:
     return candidates[0]
 
 
-def _size_info(fmt, duration):
-    """Return (bytes, is_approximate), never mislabel a bitrate estimate as exact."""
+def _size_info(fmt, duration=None):
+    """Use only size fields yt-dlp received from the source. Never guess from bitrate."""
     exact = fmt.get("filesize")
     if exact:
         return int(exact), False
@@ -76,17 +76,6 @@ def _size_info(fmt, duration):
     if approximate:
         return int(approximate), True
 
-    # yt-dlp bitrates are in kbit/s. This is only an estimate: real VBR size
-    # can differ significantly, so the Android UI prefixes the value with "约".
-    bitrate = fmt.get("abr") or fmt.get("tbr") or fmt.get("vbr")
-    try:
-        bitrate = float(bitrate or 0)
-        duration = float(duration or 0)
-    except (TypeError, ValueError):
-        return 0, False
-
-    if bitrate > 0 and duration > 0:
-        return int(bitrate * 1000.0 / 8.0 * duration), True
     return 0, False
 
 
