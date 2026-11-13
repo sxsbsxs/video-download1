@@ -265,7 +265,10 @@ object LocalYtDlpEngine {
             }
 
             val audioPath = result.optString("audio_path")
-            if (audioPath.isBlank()) return@withContext mainFile
+            if (audioPath.isBlank()) {
+                listener.onProgressUpdate(98f, 0, "下载完成，正在准备保存到手机…")
+                return@withContext mainFile
+            }
 
             val audioFile = File(audioPath)
             if (!audioFile.isFile || audioFile.length() == 0L) {
@@ -279,19 +282,33 @@ object LocalYtDlpEngine {
                 (format.videoCodec.startsWith("avc", true) || format.videoCodec.startsWith("h264", true)) &&
                 (format.audioCodec.startsWith("mp4a", true) || format.audioCodec.startsWith("aac", true))
             val output = File(outputDir, if (mp4Compatible) "videodl_merged.mp4" else "videodl_merged.mkv")
-            val command = buildString {
-                append("-y -i ${mainFile.absolutePath} -i ${audioFile.absolutePath}")
-                append(" -map 0:v:0 -map 1:a:0 -c copy")
-                if (mp4Compatible) append(" -movflags +faststart")
-                append(" ${output.absolutePath}")
-            }
-            val session = FFmpegKit.execute(command)
+            listener.onProgressUpdate(96f, 0, "音视频数据已下载，正在合并…")
+            val commandArguments = buildList {
+                add("-y")
+                add("-i")
+                add(mainFile.absolutePath)
+                add("-i")
+                add(audioFile.absolutePath)
+                add("-map")
+                add("0:v:0")
+                add("-map")
+                add("1:a:0")
+                add("-c")
+                add("copy")
+                if (mp4Compatible) {
+                    add("-movflags")
+                    add("+faststart")
+                }
+                add(output.absolutePath)
+            }.toTypedArray()
+            val session = FFmpegKit.executeWithArguments(commandArguments)
             if (!ReturnCode.isSuccess(session.returnCode) || !output.isFile || output.length() == 0L) {
                 val logs = runCatching { session.allLogsAsString }.getOrDefault("")
                 throw IOException("音视频合并失败：${logs.takeLast(700)}")
             }
             mainFile.delete()
             audioFile.delete()
+            listener.onProgressUpdate(98f, 0, "音视频合并完成，正在准备保存到手机…")
             output
         } catch (error: Exception) {
             outputDir.deleteRecursively()

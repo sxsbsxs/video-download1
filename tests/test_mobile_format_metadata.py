@@ -100,6 +100,21 @@ class MobileFormatMetadataTests(unittest.TestCase):
         self.assertEqual(best["filesize"], 8_800_000)
         self.assertFalse(best["filesize_is_approx"])
 
+    def test_niconico_format_id_can_supply_missing_height(self):
+        width, height = mobile._format_dimensions({
+            "format_id": "video-h264-1080p",
+            "width": 0,
+            "height": 0,
+        })
+        self.assertEqual(width, 0)
+        self.assertEqual(height, 1080)
+
+    def test_resolution_label_can_supply_dimensions(self):
+        self.assertEqual(
+            mobile._format_dimensions({"resolution": "1920x1080"}),
+            (1920, 1080),
+        )
+
     def test_approximate_file_sizes_are_marked(self):
         result = self.get_result()
         format_1080 = next(item for item in result["video_formats"] if item["format_id"] == "137")

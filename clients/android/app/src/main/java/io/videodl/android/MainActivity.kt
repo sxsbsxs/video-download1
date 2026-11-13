@@ -82,6 +82,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -316,7 +317,13 @@ private fun VideoDLApp(initialText: String) {
                                 ?: result.audioFormats.firstOrNull()?.key.orEmpty()
                             expandedGroups = emptySet()
                             input = result.sourceUrl
-                            status = "解析完成 · 找到 ${result.videoFormats.size + result.audioFormats.size} 种可用格式"
+                            val sourceHost = Uri.parse(result.sourceUrl).host.orEmpty().lowercase(Locale.ROOT)
+                            val highestHeight = result.videoFormats.maxOfOrNull { it.height } ?: 0
+                            status = if (sourceHost.endsWith("nicovideo.jp") && highestHeight in 1..1079) {
+                                "解析完成 · Niconico 源站当前返回最高 ${highestHeight}P"
+                            } else {
+                                "解析完成 · 找到 ${result.videoFormats.size + result.audioFormats.size} 种可用格式"
+                            }
                         } catch (error: Exception) {
                             mediaInfo = null
                             status = "解析失败"
@@ -333,12 +340,17 @@ private fun VideoDLApp(initialText: String) {
                         progress = 0f
                         status = "正在准备下载…"
                         errorText = ""
+                        var temporaryDirectory: File? = null
+                        val acceptProgress = AtomicBoolean(true)
                         try {
                             val listener = object : LocalYtDlpProgress {
                                 override fun onProgressUpdate(percent: Float, etaInSeconds: Long, line: String) {
+                                    if (!acceptProgress.get()) return
                                     scope.launch {
-                                        progress = percent.coerceIn(0f, 100f)
-                                        status = line
+                                        if (acceptProgress.get() && downloading) {
+                                            progress = percent.coerceIn(0f, 98f)
+                                            status = line
+                                        }
                                     }
                                 }
                             }
@@ -348,6 +360,9 @@ private fun VideoDLApp(initialText: String) {
                                 format = chosen,
                                 listener = listener
                             )
+                            acceptProgress.set(false)
+                            temporaryDirectory = file.parentFile
+                            progress = 98f
                             status = "正在保存到 Downloads/VideoDL…"
                             val savedMedia = withContext(Dispatchers.IO) {
                                 saveIntoDownloads(context, file, mediaInfo?.title.orEmpty())
@@ -361,14 +376,18 @@ private fun VideoDLApp(initialText: String) {
                             )
                             history = listOf(item) + history.filterNot { it.contentUri == item.contentUri }.take(19)
                             storeHistory(context, history)
-                            LocalYtDlpEngine.cleanup(file.parentFile)
+                            LocalYtDlpEngine.cleanup(temporaryDirectory)
+                            temporaryDirectory = null
                             progress = 100f
                             status = "下载完成 · 已保存到 Downloads/VideoDL"
                             selectedPage = 1
                         } catch (error: Exception) {
+                            acceptProgress.set(false)
                             status = "下载失败"
                             errorText = error.message ?: "下载过程中出现错误。"
                         } finally {
+                            acceptProgress.set(false)
+                            temporaryDirectory?.let(LocalYtDlpEngine::cleanup)
                             downloading = false
                         }
                     }
@@ -1129,13 +1148,17 @@ private fun saveIntoDownloads(context: Context, source: File, title: String): Sa
     val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
         ?: throw IllegalStateException("无法创建系统下载文件")
     try {
-        source.inputStream().use { input ->
+        val copiedBytes = source.inputStream().use { input ->
             context.contentResolver.openOutputStream(uri, "w")?.use { output ->
                 input.copyTo(output)
             } ?: throw IllegalStateException("无法写入系统下载目录")
         }
+        if (copiedBytes != source.length()) {
+            throw IllegalStateException("保存文件不完整：已写入 ${copiedBytes} 字节，源文件为 ${source.length()} 字节。")
+        }
         val complete = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
-        context.contentResolver.update(uri, complete, null, null)
+        val publishedRows = context.contentResolver.update(uri, complete, null, null)
+        if (publishedRows <= 0) throw IllegalStateException("文件已复制，但系统未能完成发布。")
         return SavedMedia(uri, displayName)
     } catch (error: Exception) {
         context.contentResolver.delete(uri, null, null)

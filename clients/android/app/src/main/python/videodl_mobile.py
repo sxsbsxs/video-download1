@@ -66,6 +66,30 @@ def extract_video_url(raw: str) -> str:
     return candidates[0]
 
 
+def _format_dimensions(fmt):
+    """Read dimensions from explicit fields, then source-supplied resolution labels."""
+    width = int(fmt.get("width") or 0)
+    height = int(fmt.get("height") or 0)
+
+    for field in ("resolution", "format_note", "format_id"):
+        value = fmt.get(field)
+        if not isinstance(value, str):
+            continue
+
+        if width <= 0 or height <= 0:
+            match = re.search(r"(?<!\\d)(\\d{3,5})\\s*[x×]\\s*(\\d{3,5})(?!\\d)", value, re.IGNORECASE)
+            if match:
+                width = width or int(match.group(1))
+                height = height or int(match.group(2))
+
+        if height <= 0:
+            match = re.search(r"(?<!\\d)(\\d{3,4})p(?!\\d)", value, re.IGNORECASE)
+            if match:
+                height = int(match.group(1))
+
+    return width, height
+
+
 def _size_info(fmt, duration=None):
     """Use only size fields yt-dlp received from the source. Never guess from bitrate."""
     exact = fmt.get("filesize")
@@ -162,7 +186,7 @@ def inspect(raw_text):
         acodec = str(item.get("acodec") or "none")
         ext = str(item.get("ext") or "mp4")
         if vcodec != "none":
-            height = int(item.get("height") or 0)
+            width, height = _format_dimensions(item)
             if height <= 0:
                 continue
             audio_format = None
@@ -179,7 +203,7 @@ def inspect(raw_text):
                 "key": "v:" + format_id,
                 "format_id": format_id,
                 "audio_format_id": audio_id,
-                "width": int(item.get("width") or 0),
+                "width": width,
                 "height": height,
                 "fps": float(item.get("fps") or 0),
                 "dynamic_range": str(item.get("dynamic_range") or ""),
@@ -229,27 +253,42 @@ def inspect(raw_text):
     }, ensure_ascii=False)
 
 
-def _download_one(url, format_id, directory, filename, listener, stage):
+def _download_one(url, format_id, directory, filename, listener, stage, progress_start=0.0, progress_span=95.0):
     template = os.path.join(directory, filename + ".%(ext)s")
 
     def progress_hook(data):
         if listener is None:
             return
         if data.get("status") == "downloading":
-            raw = str(data.get("_percent_str") or "0").replace("%", "").strip()
+            raw = str(data.get("_percent_str") or "").replace("%", "").strip()
             try:
                 percent = float(re.sub(r"[^0-9.]", "", raw) or 0)
             except ValueError:
                 percent = 0.0
+
+            if percent <= 0:
+                downloaded = float(data.get("downloaded_bytes") or 0)
+                total = float(data.get("total_bytes") or data.get("total_bytes_estimate") or 0)
+                if total > 0:
+                    percent = downloaded * 100.0 / total
+                else:
+                    fragment_index = float(data.get("fragment_index") or 0)
+                    fragment_count = float(data.get("fragment_count") or 0)
+                    if fragment_count > 0:
+                        percent = fragment_index * 100.0 / fragment_count
+
+            percent = min(100.0, max(0.0, percent))
+            overall = min(95.0, progress_start + progress_span * percent / 100.0)
             eta = int(data.get("eta") or 0)
             speed = data.get("_speed_str") or ""
             listener.onProgressUpdate(
-                percent,
+                overall,
                 eta,
                 stage + " · " + str(round(percent, 1)) + "% " + str(speed),
             )
         elif data.get("status") == "finished":
-            listener.onProgressUpdate(100.0, 0, stage + "完成，正在整理文件…")
+            finished_at = min(95.0, progress_start + progress_span)
+            listener.onProgressUpdate(finished_at, 0, stage + "下载完成，正在校验文件…")
 
     options = {
         "format": format_id,
@@ -276,13 +315,29 @@ def _download_one(url, format_id, directory, filename, listener, stage):
 def download_plan(url, video_format_id, audio_format_id, output_dir, listener=None, audio_only=False):
     os.makedirs(output_dir, exist_ok=True)
     if audio_only:
-        path = _download_one(url, video_format_id, output_dir, "audio", listener, "音频")
+        path = _download_one(
+            url, video_format_id, output_dir, "audio", listener, "音频",
+            progress_start=0.0, progress_span=95.0,
+        )
+        if listener is not None:
+            listener.onProgressUpdate(97.0, 0, "音频下载完成，正在检查文件…")
         return json.dumps({"main_path": path, "audio_path": ""})
 
-    video_path = _download_one(url, video_format_id, output_dir, "video", listener, "视频")
+    video_span = 46.0 if audio_format_id else 95.0
+    video_path = _download_one(
+        url, video_format_id, output_dir, "video", listener, "视频",
+        progress_start=0.0, progress_span=video_span,
+    )
     audio_path = ""
     if audio_format_id:
-        audio_path = _download_one(url, audio_format_id, output_dir, "audio", listener, "音频")
+        audio_path = _download_one(
+            url, audio_format_id, output_dir, "audio", listener, "音频",
+            progress_start=47.0, progress_span=46.0,
+        )
+        if listener is not None:
+            listener.onProgressUpdate(94.0, 0, "视频和音频流已下载，正在准备合并…")
+    elif listener is not None:
+        listener.onProgressUpdate(97.0, 0, "视频下载完成，正在检查文件…")
 
     return json.dumps({
         "main_path": video_path,
