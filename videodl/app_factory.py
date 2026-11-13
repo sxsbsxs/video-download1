@@ -53,7 +53,6 @@ def create_app(config: dict | None = None, engine=None, task_manager=None) -> Fl
                     request.path == "/api/tasks"
                     or (
                         request.path.startswith("/api/tasks/")
-                        and not request.path.endswith("/file")
                     )
                 )
             )

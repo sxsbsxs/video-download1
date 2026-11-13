@@ -41,15 +41,19 @@ def _clean_candidate(candidate: str) -> str:
 
     value = value.rstrip(_TRAILING_PUNCTUATION)
 
-    for suffix in (
+    for marker in (
         "复制打开",
         "复制链接",
         "点击打开",
         "点开看看",
         "打开看看",
+        "打开抖音",
+        "长按复制",
     ):
-        if value.endswith(suffix):
-            value = value[: -len(suffix)].rstrip(_TRAILING_PUNCTUATION)
+        marker_position = value.find(marker)
+        if marker_position >= 0:
+            value = value[:marker_position].rstrip(_TRAILING_PUNCTUATION)
+            break
     return value
 
 

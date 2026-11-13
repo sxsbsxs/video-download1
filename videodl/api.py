@@ -91,6 +91,7 @@ def register_routes(app) -> None:
                 "duration": info.get("duration"),
                 "uploader": info.get("uploader") or info.get("channel") or "",
                 "webpage_url": info.get("webpage_url"),
+                "source_url": url,
                 "extractor": info.get("extractor_key") or info.get("extractor"),
                 "formats": formats,
             })

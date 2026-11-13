@@ -1,6 +1,7 @@
 package io.videodl.android
 
 import android.content.ContentValues
+import android.content.Intent
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
@@ -44,10 +45,15 @@ import java.util.concurrent.TimeUnit
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val sharedText = when (intent?.action) {
+            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+            Intent.ACTION_VIEW -> intent.dataString.orEmpty()
+            else -> ""
+        }
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    VideoDLScreen()
+                    VideoDLScreen(sharedText)
                 }
             }
         }
@@ -61,7 +67,7 @@ private val httpClient = OkHttpClient.Builder()
     .build()
 
 @Composable
-private fun VideoDLScreen() {
+private fun VideoDLScreen(initialSharedText: String = "") {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember(context) {
@@ -75,7 +81,9 @@ private fun VideoDLScreen() {
         }
     }
     var apiBase by rememberSaveable { mutableStateOf(prefs.getString("apiBase", "") ?: "") }
-    var videoUrl by rememberSaveable { mutableStateOf(prefs.getString("videoUrl", "") ?: "") }
+    var videoUrl by rememberSaveable {
+        mutableStateOf(prefs.getString("videoUrl", null).orEmpty().ifBlank { initialSharedText })
+    }
     var quality by rememberSaveable { mutableStateOf(prefs.getString("quality", "best") ?: "best") }
     var title by rememberSaveable { mutableStateOf(prefs.getString("title", "") ?: "") }
     var uploader by rememberSaveable { mutableStateOf(prefs.getString("uploader", "") ?: "") }
@@ -130,6 +138,11 @@ private fun VideoDLScreen() {
                         }
                         title = info.optString("title", "未命名视频")
                         uploader = info.optString("uploader", "")
+                        val cleanSourceUrl = info.optString("source_url").takeIf { it.isNotBlank() }
+                        if (cleanSourceUrl != null) {
+                            videoUrl = cleanSourceUrl
+                            prefs.edit().putString("videoUrl", cleanSourceUrl).apply()
+                        }
                         thumbnail = info.optString("thumbnail").takeIf { it.startsWith("http") }
                         prefs.edit().apply {
                             putString("title", title)
