@@ -40,6 +40,11 @@ jobs:
           gradle-version: "8.9"
       - name: Validate embedded yt-dlp bridge
         run: python -m py_compile clients/android/app/src/main/python/videodl_mobile.py
+      - name: Validate WebView assets
+        run: |
+          node --check clients/android/app/src/main/assets/app.js
+          test -s clients/android/app/src/main/assets/index.html
+          test -s clients/android/app/src/main/assets/styles.css
       - name: Build ARM64 Android APK
         run: gradle -p clients/android assembleDebug
       - name: Report APK file size
