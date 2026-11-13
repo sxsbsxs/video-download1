@@ -152,6 +152,7 @@ class AsyncTaskApiTests(unittest.TestCase):
         file_response = self.client.get(f"/api/tasks/{task_id}/file")
         self.assertEqual(file_response.status_code, 200)
         self.assertEqual(file_response.data, b"sample-video")
+        file_response.close()
 
 
 if __name__ == "__main__":

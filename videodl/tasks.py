@@ -177,6 +177,7 @@ class DownloadTaskManager:
             return self._snapshot(task)
 
     def get_file(self, task_id: str) -> tuple[Path, str]:
+        self.prune_expired()
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:

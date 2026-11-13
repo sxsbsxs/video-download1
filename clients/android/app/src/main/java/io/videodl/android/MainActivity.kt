@@ -66,9 +66,9 @@ private fun VideoDLScreen() {
     var apiBase by rememberSaveable { mutableStateOf("") }
     var videoUrl by rememberSaveable { mutableStateOf("") }
     var quality by rememberSaveable { mutableStateOf("best") }
-    var title by remember { mutableStateOf("") }
-    var uploader by remember { mutableStateOf("") }
-    var thumbnail by remember { mutableStateOf<String?>(null) }
+    var title by rememberSaveable { mutableStateOf("") }
+    var uploader by rememberSaveable { mutableStateOf("") }
+    var thumbnail by rememberSaveable { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf("填写服务端地址和公开视频链接后开始解析。") }
     var busy by remember { mutableStateOf(false) }
     var activeTaskId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -203,8 +203,9 @@ private fun VideoDLScreen() {
                     onClick = {
                         scope.launch {
                             try {
+                                val taskId = activeTaskId ?: return@launch
                                 withContext(Dispatchers.IO) {
-                                    deleteJson(apiBase, "/api/tasks/" + activeTaskId)
+                                    deleteJson(apiBase, "/api/tasks/" + taskId)
                                 }
                                 status = "已发送取消请求，正在等待引擎确认…"
                             } catch (error: Exception) {
