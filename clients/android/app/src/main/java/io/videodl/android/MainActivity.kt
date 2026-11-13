@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
         }
         history = loadHistory(this)
 
-        window.statusBarColor = android.graphics.Color.rgb(247, 248, 250)
+        window.statusBarColor = android.graphics.Color.rgb(255, 213, 42)
         window.navigationBarColor = android.graphics.Color.WHITE
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility =
