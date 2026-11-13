@@ -1,6 +1,6 @@
 # VideoDL — 多平台视频下载应用
 
-VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。它不是网站项目，不包含网页前端；应用使用 Python + yt-dlp 引擎解析公开可访问的媒体，下载任务由队列管理，客户端可以同步查看任务状态与进度。
+VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。Android App 内置 Python + yt-dlp 引擎，直接在手机上解析并下载媒体，不需要填写服务地址、不需要部署 VideoDL API，也不需要购买服务器。项目同时保留可选的 Python 服务端，供其他语言客户端或自建集成使用；它不是 Android App 的运行前提。
 
 > 仅下载你拥有版权、已获授权或平台明确允许下载的内容。请遵守目标网站服务条款与当地法律。本项目不提供 DRM、付费墙或访问控制绕过功能。
 
@@ -8,8 +8,10 @@ VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。�
 
 | 技术 | 实际职责 |
 |---|---|
-| Kotlin + Jetpack Compose | Android 原生 UI、封面展示、任务状态轮询、进度显示、取消任务、保存到 Downloads |
-| Python + yt-dlp | 站点提取、元数据与格式清单、画质规则、FFmpeg 后处理、任务执行 |
+| Kotlin + Jetpack Compose | Android 原生 UI、动态格式选择、本地下载进度、保存到系统 Downloads |
+| Chaquopy + Python + yt-dlp | Android APK 内置的站点提取、元数据、真实格式清单与本地下载引擎 |
+| FFmpegKit | Android 本机音视频流合并与媒体封装 |
+| Flask + Python + yt-dlp | 可选服务端接口，供桌面/自动化客户端使用，不是 Android App 的前置条件 |
 | C11 + libcurl | 可复用网络 SDK、响应边界限制、下载流式写盘、传输进度、取消、原子文件落盘 |
 | C++17 | 更高层原生客户端，复用 C SDK，不再复制一套 HTTP 传输逻辑 |
 | Rust | 跨平台任务状态机、进度计算、质量解析和安全文件名规则 |
@@ -23,19 +25,19 @@ VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。�
 - yt-dlp 元数据解析：标题、封面、作者、时长、可用分辨率。
 - 链接识别：可以直接粘贴 URL，也可以粘贴包含 URL 的整段分享文案、Markdown 链接或带中文标点的文本；自动提取唯一链接后再做 URL 安全校验。
 - Android 支持从其他应用接收文本分享和直接打开 http(s) 链接；解析完成后会将输入框自动替换为识别出的干净 URL。
-- best、指定分辨率、audio 三类下载选择。
+- 可选 Flask API 服务端，供非 Android 客户端使用；Android App 不依赖它。
 - 后台任务队列：任务 ID、排队、解析、下载、处理、完成、失败和取消状态。
 - 任务状态查询接口，包含已下载字节、总字节、速度、ETA 和百分比。
 - SQLite 保存任务元数据和完成文件索引；服务重启后可恢复历史状态，未完成任务会明确标记为中断。
-- Android 客户端从服务端读取真实任务进度；支持取消任务，并保留任务 ID 以便恢复轮询。
-- Android 使用每次安装独立的随机令牌隔离下载历史；服务端只保存令牌的 SHA-256 摘要。
-- GET /api/tasks 支持读取最近任务列表，为 Android 下载历史页提供数据。
-- 完成后通过独立任务文件接口获取文件，写入 Downloads/VideoDL。
+- Android 内置 yt-dlp：在本机解析公开媒体链接，读取来源真实提供的所有视频/音频格式。
+- Android 格式列表展示实际分辨率、帧率、编码、封装格式和估算体积；视频与音频可分开选择。
+- Android 直接在设备上下载，必要时由本机 FFmpeg 合并音视频流，完成后写入 Downloads/VideoDL。
+- Android 支持接收其他应用分享的文本/链接，以及自动识别分享文案中的视频链接。
 - C11 SDK 支持流式写文件、进度回调、取消、TLS 校验、临时文件和成功后原子重命名。
 - C++ 客户端复用 C11 SDK。
 - Python、C、Rust 等模块有独立测试；GitHub Actions 构建 Android、C、C++、Java、Rust、Swift 和 C#。
 
-**目前还没有完成：** 持久化执行队列和下载自动续跑、Redis/多实例队列、断点续传、离线内置 yt-dlp、Android WorkManager 常驻下载、登录态下载和 DRM 处理。不要把这些未完成项当作已经支持的功能。
+**目前还没有完成：** Android WorkManager 长时间后台常驻下载、任务断点续传、登录态/cookie 导入和 DRM 处理。Android 端当前下载由应用进程执行；应用被系统强制结束时，不承诺自动续跑。
 
 ## 目录结构
 
