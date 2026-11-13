@@ -20,9 +20,10 @@ class Settings:
 
     @classmethod
     def from_env(cls) -> "Settings":
+        download_dir = Path(os.getenv("DOWNLOAD_DIR", "/tmp/videodl"))
         return cls(
-            download_dir=Path(os.getenv("DOWNLOAD_DIR", "/tmp/videodl")),
-            task_db_path=Path(os.getenv("TASK_DB_PATH", "/tmp/videodl/tasks.sqlite3")),
+            download_dir=download_dir,
+            task_db_path=Path(os.getenv("TASK_DB_PATH", str(download_dir / "tasks.sqlite3"))),
             max_duration_seconds=_positive_int("MAX_DURATION_SECONDS", 7200),
             max_file_mb=_positive_int("MAX_FILE_MB", 1024),
             max_concurrent_downloads=_positive_int("MAX_CONCURRENT_DOWNLOADS", 2),

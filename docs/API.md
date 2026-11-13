@@ -125,4 +125,4 @@ POST /api/download remains available for older clients. It holds the HTTP reques
 
 ## Runtime semantics
 
-The task manager is currently in-memory and process-local. Deploy one web worker per instance. Restarting the process loses active task metadata; a multi-worker/multi-instance deployment requires a shared queue and task store. Task-state GET requests have a separate higher rate limit because clients poll frequently; creating tasks and extracting metadata remain under the regular per-IP limit.
+Task metadata is stored in SQLite at TASK_DB_PATH (default: /tmp/videodl/tasks.sqlite3). Completed tasks and their file references survive a process restart when the database and download volume are persistent. In-flight tasks are recovered as failed with an interruption message; they are not automatically resumed. The executor queue and rate limiter remain process-local, so deploy one web worker per instance. Task-state GET requests have a separate higher rate limit because clients poll frequently; creating tasks and extracting metadata remain under the regular per-IP limit.

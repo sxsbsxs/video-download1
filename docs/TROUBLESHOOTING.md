@@ -6,9 +6,13 @@ Check that the queue has not reached its configured limit and that the download 
 
 ## The task ID exists during creation but GET returns 404
 
-The current task registry is process-local. All task routes for one instance must reach the same process. The Docker image uses one Gunicorn worker by design. Do not add a second worker or a second replica until a shared task store is implemented.
+Task metadata is loaded from SQLite, but the live executor and task updates are process-local. All task routes for one instance must reach the same process. The Docker image uses one Gunicorn worker by design. Do not add a second worker or a second replica until a shared queue/worker coordinator is implemented.
 
-A 404 can also mean the server restarted, the in-memory task expired, or the task ID was copied incorrectly.
+A 404 can mean the task expired, the SQLite database/volume was replaced, or the task ID was copied incorrectly. After a server restart, an interrupted task should appear as `failed` with a restart message rather than disappear.
+
+## A task is marked failed after a service restart
+
+The task record survived in SQLite, but the current worker queue cannot resume a yt-dlp process that was terminated with the service. Submit a new task. Completed files can still be downloaded if the database and download directory were kept on persistent storage.
 
 ## The task remains in cancelling
 

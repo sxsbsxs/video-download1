@@ -4,7 +4,8 @@ This roadmap describes planned work, not already shipped functionality.
 
 ## Priority 1 — reliability
 
-- Add a persistent task store and shared queue so task status survives worker routing and process restart.
+- Add a shared Redis-backed queue/worker coordinator so multiple workers can coordinate live tasks; SQLite task metadata persistence is already implemented for a single instance.
+- Add safe automatic retry/resume for interrupted tasks after the engine can verify partial-file and extractor support.
 - Add authenticated task ownership, API tokens and per-user quotas before public multi-user hosting.
 - Add structured logs, request IDs, task timing and disk-usage monitoring.
 - Add cleanup worker for expired output artifacts and abandoned temporary folders.

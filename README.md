@@ -24,13 +24,14 @@ VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。�
 - best、指定分辨率、audio 三类下载选择。
 - 后台任务队列：任务 ID、排队、解析、下载、处理、完成、失败和取消状态。
 - 任务状态查询接口，包含已下载字节、总字节、速度、ETA 和百分比。
+- SQLite 保存任务元数据和完成文件索引；服务重启后可恢复历史状态，未完成任务会明确标记为中断。
 - Android 客户端从服务端读取真实任务进度；支持取消任务，并保留任务 ID 以便恢复轮询。
 - 完成后通过独立任务文件接口获取文件，写入 Downloads/VideoDL。
 - C11 SDK 支持流式写文件、进度回调、取消、TLS 校验、临时文件和成功后原子重命名。
 - C++ 客户端复用 C11 SDK。
 - Python、C、Rust 等模块有独立测试；GitHub Actions 构建 Android、C、C++、Java、Rust、Swift 和 C#。
 
-**目前还没有完成：** 后端跨重启持久化任务、Redis/多实例队列、断点续传、离线内置 yt-dlp、Android WorkManager 常驻下载、登录态下载和 DRM 处理。不要把这些未完成项当作已经支持的功能。
+**目前还没有完成：** 持久化执行队列和下载自动续跑、Redis/多实例队列、断点续传、离线内置 yt-dlp、Android WorkManager 常驻下载、登录态下载和 DRM 处理。不要把这些未完成项当作已经支持的功能。
 
 ## 目录结构
 
@@ -45,6 +46,7 @@ VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。�
 │   ├── quality.py                  # 画质解析和 yt-dlp 格式选择
 │   ├── engine.py                   # yt-dlp/FFmpeg 引擎适配器
 │   ├── tasks.py                    # 有界任务队列和任务状态
+│   ├── task_store.py               # SQLite 任务元数据仓库
 │   ├── rate_limit.py               # 进程内滑动窗口限流
 │   └── errors.py                   # 业务错误与用户安全提示
 ├── clients/
@@ -127,9 +129,9 @@ Android Studio 打开 clients/android；其他客户端的运行方法见 [clien
 
 ## 部署时非常重要
 
-当前任务队列、状态表、限流器和下载文件索引都在**单个 Python 进程内存**。Docker/Gunicorn 因此固定为 **1 个 web worker + 8 个请求线程**；实际下载并发由独立的有界线程池控制。不要随手将 Gunicorn workers 改成 2 或更多，否则创建任务和查询任务可能落在不同进程，客户端就会遇到状态不同步或任务不存在。
+任务元数据和完成文件索引保存在 SQLite（默认 `/tmp/videodl/tasks.sqlite3`），但下载执行队列、工作线程和限流器仍属于**单个 Python 进程**。Docker/Gunicorn 因此固定为 **1 个 web worker + 8 个请求线程**；实际下载并发由独立的有界线程池控制。不要随手将 Gunicorn workers 改成 2 或更多，否则创建任务和查询任务可能落在不同进程，客户端就会遇到状态不同步或任务不存在。
 
-这是单实例、小规模使用的实现。服务重启后，内存任务状态会丢失；多实例/多 worker 方案需要把任务存储和队列迁移到 Redis/数据库，并把下载结果放到共享对象存储。详见 [docs/SECURITY.md](docs/SECURITY.md)。
+服务重启后，SQLite 中的历史任务仍可查询；已完成且文件位于持久卷中的任务可以继续获取文件。重启时正在执行的任务会被标记为“服务重启导致中断”，不会假装仍在运行，也不会自动续传。多实例/多 worker 方案仍需要共享队列/任务协调和共享文件存储。详见 [docs/SECURITY.md](docs/SECURITY.md)。
 
 ## License
 

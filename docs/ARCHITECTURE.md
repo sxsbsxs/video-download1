@@ -39,7 +39,8 @@ videodl/api.py
 - security.py: HTTP(S), credentials, hostname, DNS and public-IP checks.
 - quality.py: normalizes best/audio/resolution choices and builds yt-dlp selectors.
 - engine.py: wraps yt-dlp and finds/validates the final output.
-- tasks.py: bounded work queue, state transitions, progress snapshots, cancellation and file retention.
+- tasks.py: bounded work queue, state transitions, progress snapshots, cancellation and recovery.
+- task_store.py: SQLite repository for durable task metadata and completed artifact references.
 - rate_limit.py: process-local sliding-window request limiter.
 - errors.py: domain errors and user-safe error strings.
 
@@ -64,9 +65,9 @@ The worker reports actual yt-dlp progress events. The Android app polls GET /api
 
 ## Process model (critical)
 
-Task registry, queue capacity and rate limiting are in process memory. The Docker image therefore starts Gunicorn with one web worker and multiple request threads. The task executor runs downloads concurrently in its own bounded worker pool.
+Task metadata is rehydrated from SQLite at process start. Queue capacity, active worker threads and rate limiting remain process-local. The Docker image therefore starts Gunicorn with one web worker and multiple request threads. The task executor runs downloads concurrently in its own bounded worker pool.
 
-This is intentionally a single-instance MVP. A process restart discards task metadata; multiple web workers or replicas cannot share task state. Before scaling out, replace the in-memory task manager with a shared Redis-backed queue and persistent task records, and move output files to shared object storage.
+This is intentionally a single-instance MVP. A process restart keeps task history in SQLite; tasks that were queued or running are marked failed with an interruption reason, while completed artifacts remain downloadable when the database and file volume persist. Multiple web workers or replicas still cannot coordinate the live executor and state updates. Before scaling out, add a shared queue/worker service and shared task coordination, and move outputs to shared object storage.
 
 ## Security boundary
 
