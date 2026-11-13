@@ -8,6 +8,7 @@ import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.Alignment
@@ -286,23 +287,23 @@ private fun VideoDLScreen(initialSharedText: String = "") {
                 )
                 Text("下载画质", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    VideoDLQualityChip("最佳", "best", quality, Modifier.weight(1f)) {
+                    VideoDLQualityChip("最佳", "best", quality) {
                         quality = it
                         prefs.edit().putString("quality", it).apply()
                     }
-                    VideoDLQualityChip("1080P", "1080", quality, Modifier.weight(1f)) {
+                    VideoDLQualityChip("1080P", "1080", quality) {
                         quality = it
                         prefs.edit().putString("quality", it).apply()
                     }
-                    VideoDLQualityChip("720P", "720", quality, Modifier.weight(1f)) {
+                    VideoDLQualityChip("720P", "720", quality) {
                         quality = it
                         prefs.edit().putString("quality", it).apply()
                     }
-                    VideoDLQualityChip("音频", "audio", quality, Modifier.weight(1f)) {
+                    VideoDLQualityChip("音频", "audio", quality) {
                         quality = it
                         prefs.edit().putString("quality", it).apply()
                     }
@@ -310,7 +311,8 @@ private fun VideoDLScreen(initialSharedText: String = "") {
 
                 Button(
             enabled = !busy && apiBase.isNotBlank() && videoUrl.isNotBlank(),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(54.dp),
+            shape = RoundedCornerShape(16.dp),
             onClick = {
                 scope.launch {
                     busy = true
@@ -353,13 +355,26 @@ private fun VideoDLScreen(initialSharedText: String = "") {
             ) {
                 Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("视频信息", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                    thumbnail?.let {
+                    if (thumbnail != null) {
                         AsyncImage(
-                            model = it,
+                            model = thumbnail,
                             contentDescription = "视频封面",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(16.dp))
                         )
+                    } else {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("▶", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
+                                    Text("封面暂不可用", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
                     }
                     Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
                     if (uploader.isNotBlank()) {
@@ -369,7 +384,8 @@ private fun VideoDLScreen(initialSharedText: String = "") {
             }
             Button(
                 enabled = !busy,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = RoundedCornerShape(16.dp),
                 onClick = {
                     scope.launch {
                         busy = true
