@@ -21,6 +21,7 @@ VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。�
 
 - 公开媒体 URL 校验和基本 SSRF 防护。
 - yt-dlp 元数据解析：标题、封面、作者、时长、可用分辨率。
+- 链接识别：可以直接粘贴 URL，也可以粘贴包含 URL 的整段分享文案、Markdown 链接或带中文标点的文本；自动提取唯一链接后再做 URL 安全校验。
 - best、指定分辨率、audio 三类下载选择。
 - 后台任务队列：任务 ID、排队、解析、下载、处理、完成、失败和取消状态。
 - 任务状态查询接口，包含已下载字节、总字节、速度、ETA 和百分比。
@@ -111,7 +112,7 @@ curl -X DELETE http://127.0.0.1:8080/api/tasks/TASK_ID
 curl -L http://127.0.0.1:8080/api/tasks/TASK_ID/file -o video.mp4
 ~~~
 
-完整接口字段和状态定义见 [docs/API.md](docs/API.md)。
+链接输入不必只有裸 URL，例如 `朋友分享了视频：https://example.com/video 复制打开` 也能识别。一次粘贴多个不同链接会提示你拆开处理，避免误下载。完整接口字段和状态定义见 [docs/API.md](docs/API.md)。
 
 ## 测试和构建
 

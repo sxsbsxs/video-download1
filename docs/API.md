@@ -32,6 +32,18 @@ Request:
 }
 ~~~
 
+**URL input accepts share text**, not only a bare URL. The server extracts one HTTP(S) URL from surrounding Chinese/English text, line breaks, Markdown links, angle-bracket wrappers and common trailing punctuation. It also accepts a domain pasted without a scheme and adds HTTPS. The extracted URL is then passed through the same public-IP/SSRF validation as before.
+
+Example request:
+
+~~~json
+{
+  "url": "朋友分享给你一个视频： https://example.com/watch?id=42 。复制打开看看"
+}
+~~~
+
+If the input contains multiple different URLs, the API returns HTTP 400 and asks the caller to submit one link at a time. It does not silently pick one.
+
 Response fields include id, title, thumbnail, duration, uploader, webpage_url, extractor and formats. Each format exposes an id and label; resolution entries may also include width, height, fps and extension. The response includes best and audio choices.
 
 ## List recent tasks for one app installation
