@@ -143,7 +143,7 @@ private data class QualityGroup(
 private fun buildQualityGroups(formats: List<VideoFormat>): List<QualityGroup> {
     return formats.groupBy { format ->
         val fps = if (format.fps > 0) String.format(Locale.US, "%.2f", format.fps) else "0"
-        "${format.width}|${format.height}|\$fps|${format.dynamicRange.trim().lowercase(Locale.ROOT)}"
+        "${format.width}|${format.height}|$fps|${format.dynamicRange.trim().lowercase(Locale.ROOT)}"
     }.map { (key, options) ->
         val sorted = options.sortedWith(
             compareByDescending<VideoFormat> { it.bitrate }
