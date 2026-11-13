@@ -304,6 +304,20 @@ class DownloadTaskManager:
             self._persist_locked(task)
             return self._snapshot(task)
 
+    def retry(self, task_id: str, owner_id: str) -> dict:
+        """Create a fresh task from a failed/cancelled task owned by this client."""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if task is None or task.owner_id != owner_id:
+                raise TaskNotFound("下载任务不存在或不属于此设备。")
+            if task.state not in {"failed", "cancelled"}:
+                raise TaskNotReady("只有失败或已取消的任务可以重新下载。")
+            url = task.url
+            quality = task.quality
+            task_owner_id = task.owner_id
+
+        return self.submit(url, quality, owner_id=task_owner_id)
+
     def get_file(self, task_id: str) -> tuple[Path, str]:
         self.prune_expired()
         with self._lock:

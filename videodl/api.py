@@ -128,6 +128,26 @@ def register_routes(app) -> None:
         except TaskQueueFull as error:
             return jsonify(error=str(error)), 429
 
+    @app.post("/api/tasks/<task_id>/retry")
+    def retry_download_task(task_id: str):
+        owner_id = _owner_id()
+        if owner_id is None:
+            return jsonify(error="客户端令牌格式无效。"), 400
+        if not owner_id:
+            return jsonify(error="重新下载需要原设备的客户端令牌。"), 401
+        try:
+            task = app.extensions["videodl.task_manager"].retry(task_id, owner_id)
+            return jsonify(
+                task=task,
+                status_url=f"/api/tasks/{task['id']}",
+            ), 202
+        except TaskNotFound as error:
+            return jsonify(error=str(error)), 404
+        except TaskNotReady as error:
+            return jsonify(error=str(error)), 409
+        except TaskQueueFull as error:
+            return jsonify(error=str(error)), 429
+
     @app.get("/api/tasks/<task_id>")
     def get_download_task(task_id: str):
         try:

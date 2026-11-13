@@ -47,6 +47,23 @@ class BlockingEngine:
         return path
 
 
+class FailsOnceEngine:
+    def __init__(self):
+        self.calls = 0
+        self.lock = threading.Lock()
+
+    def download_video(self, _url, _quality, output_dir, progress_hook=None):
+        with self.lock:
+            self.calls += 1
+            call = self.calls
+        if call == 1:
+            raise RuntimeError("temporary network failure")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        path = output_dir / "retried-video.mp4"
+        path.write_bytes(b"retried-video")
+        return path
+
+
 class DownloadTaskManagerTests(unittest.TestCase):
     def wait_for_state(self, manager, task_id, expected):
         deadline = time.monotonic() + 5
@@ -163,6 +180,33 @@ class DownloadTaskManagerTests(unittest.TestCase):
                     [item["id"] for item in manager.list_recent(owner_id="owner-b")],
                     [second["id"]],
                 )
+            finally:
+                manager.shutdown()
+
+    def test_retry_failed_task_preserves_quality_and_owner(self):
+        with tempfile.TemporaryDirectory() as temp:
+            manager = DownloadTaskManager(
+                FailsOnceEngine(), Path(temp) / "tasks",
+                max_workers=1, max_queue=2,
+                store_path=Path(temp) / "tasks.sqlite3",
+            )
+            try:
+                first = manager.submit(
+                    "https://example.com/video", "1080", owner_id="device-one"
+                )
+                failed = self.wait_for_state(manager, first["id"], "failed")
+                self.assertIsNotNone(failed["error"])
+
+                retried = manager.retry(first["id"], owner_id="device-one")
+                self.assertNotEqual(retried["id"], first["id"])
+                completed = self.wait_for_state(manager, retried["id"], "completed")
+                self.assertEqual(completed["quality"], "1080")
+                self.assertEqual(
+                    [item["id"] for item in manager.list_recent(owner_id="device-one")],
+                    [retried["id"], first["id"]],
+                )
+                with self.assertRaises(Exception):
+                    manager.retry(first["id"], owner_id="another-device")
             finally:
                 manager.shutdown()
 

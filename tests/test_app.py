@@ -47,6 +47,23 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_retry_requires_owner_token(self):
+        response = self.client.post("/api/tasks/unknown-task/retry")
+        self.assertEqual(response.status_code, 401)
+
+        malformed = self.client.post(
+            "/api/tasks/unknown-task/retry",
+            headers={"X-VideoDL-Owner": "short"},
+        )
+        self.assertEqual(malformed.status_code, 400)
+
+    def test_retry_hides_tasks_from_another_owner(self):
+        response = self.client.post(
+            "/api/tasks/unknown-task/retry",
+            headers={"X-VideoDL-Owner": "test-device-owner-token-0123456789"},
+        )
+        self.assertEqual(response.status_code, 404)
+
     def test_task_history_rejects_invalid_limit(self):
         headers = {"X-VideoDL-Owner": "test-device-owner-token-0123456789"}
         self.assertEqual(self.client.get("/api/tasks?limit=0", headers=headers).status_code, 400)
