@@ -150,16 +150,22 @@ def register_routes(app) -> None:
 
     @app.get("/api/tasks/<task_id>")
     def get_download_task(task_id: str):
+        owner_id = _owner_id()
+        if owner_id is None:
+            return jsonify(error="客户端令牌格式无效。"), 400
         try:
-            task = app.extensions["videodl.task_manager"].get(task_id)
+            task = app.extensions["videodl.task_manager"].get(task_id, owner_id=owner_id)
             return jsonify(task=task)
         except TaskNotFound as error:
             return jsonify(error=str(error)), 404
 
     @app.delete("/api/tasks/<task_id>")
     def cancel_download_task(task_id: str):
+        owner_id = _owner_id()
+        if owner_id is None:
+            return jsonify(error="客户端令牌格式无效。"), 400
         try:
-            task = app.extensions["videodl.task_manager"].cancel(task_id)
+            task = app.extensions["videodl.task_manager"].cancel(task_id, owner_id=owner_id)
             status = 202 if task["state"] in {"cancelling", "cancelled"} else 200
             return jsonify(task=task), status
         except TaskNotFound as error:
@@ -167,8 +173,13 @@ def register_routes(app) -> None:
 
     @app.get("/api/tasks/<task_id>/file")
     def download_task_file(task_id: str):
+        owner_id = _owner_id()
+        if owner_id is None:
+            return jsonify(error="客户端令牌格式无效。"), 400
         try:
-            path, filename = app.extensions["videodl.task_manager"].get_file(task_id)
+            path, filename = app.extensions["videodl.task_manager"].get_file(
+                task_id, owner_id=owner_id
+            )
             safe_name = secure_filename(filename) or (
                 f"videodl-{uuid.uuid4().hex[:8]}{Path(filename).suffix}"
             )

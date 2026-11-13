@@ -264,11 +264,11 @@ class DownloadTaskManager:
         finally:
             self._capacity.release()
 
-    def get(self, task_id: str) -> dict:
+    def get(self, task_id: str, owner_id: str | None = None) -> dict:
         self.prune_expired()
         with self._lock:
             task = self._tasks.get(task_id)
-            if task is None:
+            if task is None or (owner_id is not None and task.owner_id != owner_id):
                 raise TaskNotFound("下载任务不存在或已过期。")
             return self._snapshot(task)
 
@@ -291,10 +291,10 @@ class DownloadTaskManager:
             )[:bounded_limit]
             return [self._snapshot(task) for task in recent]
 
-    def cancel(self, task_id: str) -> dict:
+    def cancel(self, task_id: str, owner_id: str | None = None) -> dict:
         with self._lock:
             task = self._tasks.get(task_id)
-            if task is None:
+            if task is None or (owner_id is not None and task.owner_id != owner_id):
                 raise TaskNotFound("下载任务不存在或已过期。")
             if task.state in TERMINAL_STATES:
                 return self._snapshot(task)
@@ -318,11 +318,13 @@ class DownloadTaskManager:
 
         return self.submit(url, quality, owner_id=task_owner_id)
 
-    def get_file(self, task_id: str) -> tuple[Path, str]:
+    def get_file(
+        self, task_id: str, owner_id: str | None = None
+    ) -> tuple[Path, str]:
         self.prune_expired()
         with self._lock:
             task = self._tasks.get(task_id)
-            if task is None:
+            if task is None or (owner_id is not None and task.owner_id != owner_id):
                 raise TaskNotFound("下载任务不存在或已过期。")
             if task.state != "completed" or task.file_path is None:
                 raise TaskNotReady("任务尚未完成，暂时没有可下载文件。")

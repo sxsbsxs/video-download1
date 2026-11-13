@@ -177,7 +177,10 @@ class AsyncTaskApiTests(unittest.TestCase):
         deadline = time.monotonic() + 5
         task = None
         while time.monotonic() < deadline:
-            response = self.client.get(f"/api/tasks/{task_id}")
+            response = self.client.get(
+                f"/api/tasks/{task_id}",
+                headers={"X-VideoDL-Owner": self.OWNER_TOKEN},
+            )
             task = response.json["task"]
             if task["state"] in {"completed", "failed", "cancelled"}:
                 break
@@ -187,9 +190,30 @@ class AsyncTaskApiTests(unittest.TestCase):
         # Polling must use its own high-frequency budget, not the stricter
         # task-creation/info request limit.
         for _ in range(20):
-            poll = self.client.get(f"/api/tasks/{task_id}")
+            poll = self.client.get(
+                f"/api/tasks/{task_id}",
+                headers={"X-VideoDL-Owner": self.OWNER_TOKEN},
+            )
             self.assertEqual(poll.status_code, 200)
-        file_response = self.client.get(f"/api/tasks/{task_id}/file")
+        other_headers = {
+            "X-VideoDL-Owner": "another-device-owner-token-0123456789"
+        }
+        self.assertEqual(
+            self.client.get(f"/api/tasks/{task_id}", headers=other_headers).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.delete(f"/api/tasks/{task_id}", headers=other_headers).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.get(f"/api/tasks/{task_id}/file", headers=other_headers).status_code,
+            404,
+        )
+        file_response = self.client.get(
+            f"/api/tasks/{task_id}/file",
+            headers={"X-VideoDL-Owner": self.OWNER_TOKEN},
+        )
         self.assertEqual(file_response.status_code, 200)
         self.assertEqual(file_response.data, b"sample-video")
         file_response.close()
