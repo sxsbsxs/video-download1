@@ -38,13 +38,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - name: Validate embedded yt-dlp bridge
+      - name: Validate embedded yt-dlp engine
         run: python -m py_compile clients/android/app/src/main/python/videodl_mobile.py
-      - name: Validate WebView assets
+      - name: Validate native Compose source
         run: |
-          node --check clients/android/app/src/main/assets/app.js
-          test -s clients/android/app/src/main/assets/index.html
-          test -s clients/android/app/src/main/assets/styles.css
+          test -s clients/android/app/src/main/java/io/videodl/android/MainActivity.kt
+          test -s clients/android/app/src/main/java/io/videodl/android/VideoDLScreen.kt
+          grep -q 'org.jetbrains.kotlin.plugin.compose' clients/android/app/build.gradle.kts
+          grep -q 'androidx.compose.material3:material3' clients/android/app/build.gradle.kts
       - name: Build ARM64 Android APK
         run: gradle -p clients/android assembleDebug
       - name: Report APK file size
@@ -52,7 +53,7 @@ jobs:
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: VideoDL-Android-arm64-debug
+          name: VideoDL-Compose-Android-arm64-debug
           path: clients/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
 
