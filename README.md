@@ -62,6 +62,8 @@ VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。�
 │   ├── API.md                      # API 请求、状态和错误定义
 │   ├── ARCHITECTURE.md             # 模块边界和数据流
 │   ├── ANDROID.md                  # Android 客户端说明
+│   ├── DEPLOYMENT.md               # 单实例部署说明
+│   ├── TROUBLESHOOTING.md          # 状态同步和故障排查
 │   ├── SECURITY.md                 # 威胁模型和部署注意事项
 │   └── ROADMAP.md                  # 未完成工作和优先级
 ├── .github/workflows/              # 自动测试和多语言构建

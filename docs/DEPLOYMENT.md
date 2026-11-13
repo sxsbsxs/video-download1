@@ -34,7 +34,8 @@ Adding replicas or multiple workers before using a shared task store can produce
 | MAX_CONCURRENT_DOWNLOADS | 2 | Background worker count and sync endpoint slots |
 | TASK_QUEUE_SIZE | 8 | Additional queued tasks |
 | TASK_RETENTION_SECONDS | 3600 | In-memory task and artifact retention window |
-| RATE_LIMIT_PER_MINUTE | 10 | Per-IP limit for task creation, info and other API requests |\n| TASK_STATUS_RATE_LIMIT_PER_MINUTE | 240 | Separate per-IP budget for task-state polling |
+| RATE_LIMIT_PER_MINUTE | 10 | Per-IP limit for task creation, info and other API requests |
+| TASK_STATUS_RATE_LIMIT_PER_MINUTE | 240 | Separate per-IP budget for task-state polling |
 | MAX_REQUEST_BYTES | 16384 | Maximum JSON request size |
 
 ## Health check
