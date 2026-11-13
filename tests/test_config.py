@@ -14,6 +14,7 @@ class SettingsTests(unittest.TestCase):
                 "TASK_QUEUE_SIZE": 0,
             })
         self.assertIsInstance(settings.download_dir, Path)
+        self.assertEqual(settings.task_db_path, Path(temp) / "tasks.sqlite3")
         self.assertEqual(settings.max_concurrent_downloads, 3)
         self.assertEqual(settings.task_queue_size, 0)
 

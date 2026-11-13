@@ -54,6 +54,8 @@ class Settings:
             updates["download_dir"] = Path(updates["download_dir"])
         if "task_db_path" in updates:
             updates["task_db_path"] = Path(updates["task_db_path"])
+        elif "download_dir" in updates:
+            updates["task_db_path"] = updates["download_dir"] / "tasks.sqlite3"
         updated = Settings(**{**self.__dict__, **updates})
         if updated.max_duration_seconds <= 0 or updated.max_file_mb <= 0:
             raise ValueError("视频时长和文件大小限制必须大于 0。")
