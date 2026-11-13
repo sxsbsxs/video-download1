@@ -18,6 +18,12 @@ from .errors import (
 )
 from .quality import normalize_quality
 from .security import validate_public_url
+from .url_input import extract_video_url
+
+
+def _validated_video_url(raw: str) -> str:
+    """Extract one URL from pasted share text, then apply SSRF validation."""
+    return validate_public_url(extract_video_url(raw))
 
 
 def _payload() -> dict:
@@ -75,7 +81,7 @@ def register_routes(app) -> None:
     def video_info():
         data = _payload()
         try:
-            url = validate_public_url(data.get("url", ""))
+            url = _validated_video_url(data.get("url", ""))
             info = app.extensions["videodl.engine"].extract_info(url)
             formats = _video_formats(info)
             return jsonify({
@@ -117,7 +123,7 @@ def register_routes(app) -> None:
         if owner_id is None:
             return jsonify(error="客户端令牌格式无效。"), 400
         try:
-            url = validate_public_url(data.get("url", ""))
+            url = _validated_video_url(data.get("url", ""))
             quality = normalize_quality(data.get("quality", "best"))
             task = app.extensions["videodl.task_manager"].submit(
                 url, quality, owner_id=owner_id
@@ -199,7 +205,7 @@ def register_routes(app) -> None:
         """Compatibility endpoint for older synchronous clients."""
         data = _payload()
         try:
-            url = validate_public_url(data.get("url", ""))
+            url = _validated_video_url(data.get("url", ""))
             quality = normalize_quality(data.get("quality", "best"))
         except ValueError as error:
             return jsonify(error=str(error)), 400

@@ -47,6 +47,16 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_info_accepts_url_embedded_in_share_text(self):
+        share_text = "朋友分享了视频： https://example.com/watch?id=42 。快去看看"
+        with patch(
+            "videodl.api.validate_public_url",
+            side_effect=lambda value: value,
+        ) as validator:
+            response = self.client.post("/api/info", json={"url": share_text})
+        self.assertEqual(response.status_code, 200)
+        validator.assert_called_once_with("https://example.com/watch?id=42")
+
     def test_retry_requires_owner_token(self):
         response = self.client.post("/api/tasks/unknown-task/retry")
         self.assertEqual(response.status_code, 401)
@@ -163,13 +173,17 @@ class AsyncTaskApiTests(unittest.TestCase):
         self.assertEqual(ids[-1], "audio")
 
     def test_task_completes_and_file_can_be_downloaded(self):
-        with patch("videodl.api.validate_public_url",
-                   return_value="https://example.com/video"):
+        share_text = "分享给你一个视频：\nhttps://example.com/video 复制打开"
+        with patch(
+            "videodl.api.validate_public_url",
+            side_effect=lambda value: value,
+        ) as validator:
             created = self.client.post(
                 "/api/tasks",
-                json={"url": "https://example.com/video", "quality": "720"},
+                json={"url": share_text, "quality": "720"},
                 headers={"X-VideoDL-Owner": self.OWNER_TOKEN},
             )
+        validator.assert_called_once_with("https://example.com/video")
         self.assertEqual(created.status_code, 202)
         task_id = created.json["task"]["id"]
 

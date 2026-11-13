@@ -108,7 +108,7 @@ private fun VideoDLScreen() {
                 videoUrl = it
                 prefs.edit().putString("videoUrl", it).apply()
             }, modifier = Modifier.fillMaxWidth(),
-            label = { Text("视频链接") }, placeholder = { Text("粘贴公开视频链接") }, minLines = 2
+            label = { Text("视频链接") }, placeholder = { Text("可粘贴整段分享文案，自动识别其中的链接") }, minLines = 2
         )
         OutlinedTextField(
             value = quality, onValueChange = {
