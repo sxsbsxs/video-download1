@@ -30,7 +30,7 @@ The engine reports resolutions exposed by the site's extractor. A requested reso
 
 ## HTTP 429
 
-The per-IP rate limiter or bounded task queue rejected the request. Wait, reduce concurrent submissions, or review the configured rate and queue capacity.
+The regular per-IP rate limiter or bounded task queue rejected the request. Task-state polling uses a separate higher rate budget. Wait, reduce concurrent submissions, or review RATE_LIMIT_PER_MINUTE, TASK_STATUS_RATE_LIMIT_PER_MINUTE and queue capacity.
 
 ## HTTP 422
 

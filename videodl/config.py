@@ -12,6 +12,7 @@ class Settings:
     max_file_mb: int = 1024
     max_concurrent_downloads: int = 2
     rate_limit_per_minute: int = 10
+    task_status_rate_limit_per_minute: int = 240
     task_queue_size: int = 8
     task_retention_seconds: int = 3600
     max_request_bytes: int = 16 * 1024
@@ -24,6 +25,7 @@ class Settings:
             max_file_mb=_positive_int("MAX_FILE_MB", 1024),
             max_concurrent_downloads=_positive_int("MAX_CONCURRENT_DOWNLOADS", 2),
             rate_limit_per_minute=_positive_int("RATE_LIMIT_PER_MINUTE", 10),
+            task_status_rate_limit_per_minute=_positive_int("TASK_STATUS_RATE_LIMIT_PER_MINUTE", 240),
             task_queue_size=_non_negative_int("TASK_QUEUE_SIZE", 8),
             task_retention_seconds=_positive_int("TASK_RETENTION_SECONDS", 3600),
             max_request_bytes=_positive_int("MAX_REQUEST_BYTES", 16 * 1024),
@@ -36,6 +38,7 @@ class Settings:
             "MAX_FILE_MB": "max_file_mb",
             "MAX_CONCURRENT_DOWNLOADS": "max_concurrent_downloads",
             "RATE_LIMIT_PER_MINUTE": "rate_limit_per_minute",
+            "TASK_STATUS_RATE_LIMIT_PER_MINUTE": "task_status_rate_limit_per_minute",
             "TASK_QUEUE_SIZE": "task_queue_size",
             "TASK_RETENTION_SECONDS": "task_retention_seconds",
             "MAX_REQUEST_BYTES": "max_request_bytes",
@@ -49,7 +52,8 @@ class Settings:
         updated = Settings(**{**self.__dict__, **updates})
         if updated.max_duration_seconds <= 0 or updated.max_file_mb <= 0:
             raise ValueError("视频时长和文件大小限制必须大于 0。")
-        if updated.max_concurrent_downloads <= 0 or updated.rate_limit_per_minute <= 0:
+        if (updated.max_concurrent_downloads <= 0 or updated.rate_limit_per_minute <= 0
+                or updated.task_status_rate_limit_per_minute <= 0):
             raise ValueError("并发数和限流值必须大于 0。")
         if updated.task_queue_size < 0 or updated.task_retention_seconds <= 0:
             raise ValueError("队列长度不能小于 0，任务保留时间必须大于 0。")

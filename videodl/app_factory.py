@@ -38,12 +38,24 @@ def create_app(config: dict | None = None, engine=None, task_manager=None) -> Fl
     app.extensions["videodl.rate_limiter"] = RateLimiter(
         limit=settings.rate_limit_per_minute
     )
+    app.extensions["videodl.status_rate_limiter"] = RateLimiter(
+        limit=settings.task_status_rate_limit_per_minute
+    )
 
     @app.before_request
     def enforce_api_limits():
         if request.path.startswith("/api/") and request.path != "/api/health":
             client_key = request.remote_addr or "unknown"
-            if not app.extensions["videodl.rate_limiter"].allow(client_key):
+            is_task_poll = (
+                request.method == "GET"
+                and request.path.startswith("/api/tasks/")
+                and not request.path.endswith("/file")
+            )
+            limiter_key = (
+                "videodl.status_rate_limiter"
+                if is_task_poll else "videodl.rate_limiter"
+            )
+            if not app.extensions[limiter_key].allow(client_key):
                 return jsonify(error="请求过于频繁，请稍后再试。"), 429
         return None
 

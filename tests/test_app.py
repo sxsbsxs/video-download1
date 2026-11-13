@@ -103,7 +103,7 @@ class AsyncTaskApiTests(unittest.TestCase):
             {
                 "TESTING": True,
                 "DOWNLOAD_DIR": Path(self.temp_dir.name),
-                "RATE_LIMIT_PER_MINUTE": 100,
+                "RATE_LIMIT_PER_MINUTE": 1,\n                "TASK_STATUS_RATE_LIMIT_PER_MINUTE": 100,
                 "MAX_CONCURRENT_DOWNLOADS": 1,
                 "TASK_QUEUE_SIZE": 2,
             },
@@ -149,6 +149,11 @@ class AsyncTaskApiTests(unittest.TestCase):
             time.sleep(0.02)
 
         self.assertEqual(task["state"], "completed")
+        # Polling must use its own high-frequency budget, not the stricter
+        # task-creation/info request limit.
+        for _ in range(20):
+            poll = self.client.get(f"/api/tasks/{task_id}")
+            self.assertEqual(poll.status_code, 200)
         file_response = self.client.get(f"/api/tasks/{task_id}/file")
         self.assertEqual(file_response.status_code, 200)
         self.assertEqual(file_response.data, b"sample-video")

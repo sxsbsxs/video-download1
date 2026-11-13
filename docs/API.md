@@ -125,4 +125,4 @@ POST /api/download remains available for older clients. It holds the HTTP reques
 
 ## Runtime semantics
 
-The task manager is currently in-memory and process-local. Deploy one web worker per instance. Restarting the process loses active task metadata; a multi-worker/multi-instance deployment requires a shared queue and task store.
+The task manager is currently in-memory and process-local. Deploy one web worker per instance. Restarting the process loses active task metadata; a multi-worker/multi-instance deployment requires a shared queue and task store. Task-state GET requests have a separate higher rate limit because clients poll frequently; creating tasks and extracting metadata remain under the regular per-IP limit.
