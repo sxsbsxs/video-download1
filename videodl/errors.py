@@ -2,11 +2,11 @@ class VideoDLError(Exception):
     """Base class for expected VideoDL failures."""
 
 
-class InvalidVideoURL(VideoDLError):
+class InvalidVideoURL(VideoDLError, ValueError):
     pass
 
 
-class InvalidQuality(VideoDLError):
+class InvalidQuality(VideoDLError, ValueError):
     pass
 
 

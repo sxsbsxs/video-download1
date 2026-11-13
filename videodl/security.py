@@ -21,13 +21,14 @@ def validate_public_url(raw: str) -> str:
     value = raw.strip()
     try:
         parsed = urlparse(value)
-        if parsed.scheme.lower() not in ("http", "https") or not parsed.hostname:
-            raise InvalidVideoURL("仅支持 http 或 https 视频链接。")
-        if parsed.username or parsed.password:
-            raise InvalidVideoURL("网址中不能包含账号或密码信息。")
         port = parsed.port
     except ValueError as error:
         raise InvalidVideoURL("视频网址格式无效。") from error
+
+    if parsed.scheme.lower() not in ("http", "https") or not parsed.hostname:
+        raise InvalidVideoURL("仅支持 http 或 https 视频链接。")
+    if parsed.username or parsed.password:
+        raise InvalidVideoURL("网址中不能包含账号或密码信息。")
 
     host = parsed.hostname.rstrip(".").lower()
     if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
