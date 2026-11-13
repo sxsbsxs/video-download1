@@ -50,10 +50,13 @@ class TaskStoreTests(unittest.TestCase):
             connection.close()
 
             store = TaskStore(database)
-            columns = {
-                row["name"]
-                for row in store._connect().execute("PRAGMA table_info(download_tasks)")
-            }
+            with store._connection() as migrated_connection:
+                columns = {
+                    row["name"]
+                    for row in migrated_connection.execute(
+                        "PRAGMA table_info(download_tasks)"
+                    )
+                }
             self.assertIn("owner_id", columns)
 
     def test_upsert_and_read_back_task(self):

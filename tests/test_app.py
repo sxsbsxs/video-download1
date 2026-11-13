@@ -48,7 +48,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_task_history_rejects_invalid_limit(self):
-        headers = {"X-VideoDL-Owner": self.OWNER_TOKEN}
+        headers = {"X-VideoDL-Owner": "test-device-owner-token-0123456789"}
         self.assertEqual(self.client.get("/api/tasks?limit=0", headers=headers).status_code, 400)
         self.assertEqual(self.client.get("/api/tasks?limit=101", headers=headers).status_code, 400)
         self.assertEqual(self.client.get("/api/tasks?limit=nope", headers=headers).status_code, 400)
