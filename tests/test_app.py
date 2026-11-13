@@ -48,9 +48,11 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_task_history_rejects_invalid_limit(self):
-        self.assertEqual(self.client.get("/api/tasks?limit=0").status_code, 400)
-        self.assertEqual(self.client.get("/api/tasks?limit=101").status_code, 400)
-        self.assertEqual(self.client.get("/api/tasks?limit=nope").status_code, 400)
+        headers = {"X-VideoDL-Owner": self.OWNER_TOKEN}
+        self.assertEqual(self.client.get("/api/tasks?limit=0", headers=headers).status_code, 400)
+        self.assertEqual(self.client.get("/api/tasks?limit=101", headers=headers).status_code, 400)
+        self.assertEqual(self.client.get("/api/tasks?limit=nope", headers=headers).status_code, 400)
+        self.assertEqual(self.client.get("/api/tasks?limit=20").status_code, 401)
 
     def test_invalid_quality_rejected_before_queue(self):
         with patch("videodl.api.validate_public_url",
@@ -100,6 +102,8 @@ class FakeEngine:
 
 
 class AsyncTaskApiTests(unittest.TestCase):
+    OWNER_TOKEN = "test-device-owner-token-0123456789"
+
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         from videodl.app_factory import create_app
@@ -140,6 +144,7 @@ class AsyncTaskApiTests(unittest.TestCase):
             created = self.client.post(
                 "/api/tasks",
                 json={"url": "https://example.com/video", "quality": "720"},
+                headers={"X-VideoDL-Owner": self.OWNER_TOKEN},
             )
         self.assertEqual(created.status_code, 202)
         task_id = created.json["task"]["id"]
@@ -165,12 +170,30 @@ class AsyncTaskApiTests(unittest.TestCase):
         self.assertEqual(file_response.data, b"sample-video")
         file_response.close()
 
-        history = self.client.get("/api/tasks?limit=10")
+        history = self.client.get(
+            "/api/tasks?limit=10",
+            headers={"X-VideoDL-Owner": self.OWNER_TOKEN},
+        )
         self.assertEqual(history.status_code, 200)
-        self.assertEqual(self.client.get("/api/tasks?limit=10").status_code, 200)
-        self.assertEqual(self.client.get("/api/tasks?limit=10").status_code, 200)
+        self.assertEqual(
+            self.client.get(
+                "/api/tasks?limit=10",
+                headers={"X-VideoDL-Owner": self.OWNER_TOKEN},
+            ).status_code,
+            200,
+        )
         history_ids = [item["id"] for item in history.json["tasks"]]
         self.assertIn(task_id, history_ids)
+
+        other_owner_history = self.client.get(
+            "/api/tasks?limit=10",
+            headers={"X-VideoDL-Owner": "another-device-owner-token-0123456789"},
+        )
+        self.assertEqual(other_owner_history.status_code, 200)
+        self.assertNotIn(
+            task_id,
+            [item["id"] for item in other_owner_history.json["tasks"]],
+        )
 
 
 if __name__ == "__main__":

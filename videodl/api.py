@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import shutil
 import tempfile
 import uuid
@@ -22,6 +23,16 @@ from .security import validate_public_url
 def _payload() -> dict:
     data = request.get_json(silent=True)
     return data if isinstance(data, dict) else {}
+
+
+def _owner_id() -> str | None:
+    """Hash a client-held bearer token; never persist or log the raw token."""
+    token = request.headers.get("X-VideoDL-Owner", "").strip()
+    if not token:
+        return ""
+    if len(token) < 32 or len(token) > 256:
+        return None
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def _video_formats(info: dict) -> list[dict]:
@@ -85,22 +96,32 @@ def register_routes(app) -> None:
 
     @app.get("/api/tasks")
     def list_download_tasks():
+        owner_id = _owner_id()
+        if not owner_id:
+            return jsonify(error="下载历史需要此设备的客户端令牌。"), 401
+        if owner_id is None:
+            return jsonify(error="客户端令牌格式无效。"), 400
         try:
             limit = int(request.args.get("limit", "20"))
         except (TypeError, ValueError):
             return jsonify(error="limit 必须是 1 到 100 之间的整数。"), 400
         if not 1 <= limit <= 100:
             return jsonify(error="limit 必须是 1 到 100 之间的整数。"), 400
-        tasks = app.extensions["videodl.task_manager"].list_recent(limit)
+        tasks = app.extensions["videodl.task_manager"].list_recent(limit, owner_id)
         return jsonify(tasks=tasks)
 
     @app.post("/api/tasks")
     def create_download_task():
         data = _payload()
+        owner_id = _owner_id()
+        if owner_id is None:
+            return jsonify(error="客户端令牌格式无效。"), 400
         try:
             url = validate_public_url(data.get("url", ""))
             quality = normalize_quality(data.get("quality", "best"))
-            task = app.extensions["videodl.task_manager"].submit(url, quality)
+            task = app.extensions["videodl.task_manager"].submit(
+                url, quality, owner_id=owner_id
+            )
             return jsonify(task=task, status_url=f"/api/tasks/{task['id']}"), 202
         except ValueError as error:
             return jsonify(error=str(error)), 400
