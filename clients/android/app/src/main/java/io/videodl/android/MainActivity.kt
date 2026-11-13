@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
 
         @SuppressLint("SetJavaScriptEnabled")
         val view = WebView(this).apply {
-            setBackgroundColor(android.graphics.Color.rgb(248, 249, 252))
+            setBackgroundColor(android.graphics.Color.rgb(246, 248, 252))
             overScrollMode = View.OVER_SCROLL_NEVER
             isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
@@ -224,10 +224,12 @@ class MainActivity : ComponentActivity() {
         progress = 0f
         statusText = "正在准备下载…"
         errorText = ""
+        lastProgressPush = 0L
         renderState()
 
         activityScope.launch {
             var temporaryDirectory: File? = null
+            var lastSaveProgressPush = 0L
             val acceptProgress = AtomicBoolean(true)
             try {
                 val listener = object : LocalYtDlpProgress {
@@ -250,27 +252,60 @@ class MainActivity : ComponentActivity() {
                 acceptProgress.set(false)
                 temporaryDirectory = file.parentFile
                 progress = 98f
-                statusText = "正在保存到 Downloads/VideoDL…"
+                statusText = "下载数据已就绪，正在保存到手机…"
                 renderState()
 
                 val savedMedia = withContext(Dispatchers.IO) {
-                    saveIntoDownloads(this@MainActivity, file, info.title)
+                    saveIntoDownloads(this@MainActivity, file, info.title) { copiedBytes, totalBytes ->
+                        val now = SystemClock.elapsedRealtime()
+                        if (now - lastSaveProgressPush >= 300L || copiedBytes >= totalBytes) {
+                            lastSaveProgressPush = now
+                            runOnUiThread {
+                                if (downloading) {
+                                    val ratio = if (totalBytes > 0L) {
+                                        (copiedBytes.toDouble() / totalBytes.toDouble()).coerceIn(0.0, 1.0)
+                                    } else {
+                                        0.0
+                                    }
+                                    progress = (98f + (ratio * 1.4f).toFloat()).coerceIn(98f, 99.5f)
+                                    val percent = (ratio * 100.0).toInt().coerceAtMost(99)
+                                    statusText = "正在写入手机存储 · " + percent + "%"
+                                    renderState()
+                                }
+                            }
+                        }
+                    }
                 }
+
+                progress = 99.7f
+                statusText = "正在清理临时文件…"
+                renderState()
+                val completedDirectory = temporaryDirectory
+                withContext(Dispatchers.IO) {
+                    LocalYtDlpEngine.cleanup(completedDirectory)
+                }
+                temporaryDirectory = null
+
                 val item = SavedDownload(info.title, savedMedia.displayName, System.currentTimeMillis(), savedMedia.uri.toString())
                 history = listOf(item) + history.filterNot { it.contentUri == item.contentUri }.take(19)
                 storeHistory(this@MainActivity, history)
-                LocalYtDlpEngine.cleanup(temporaryDirectory)
-                temporaryDirectory = null
                 progress = 100f
                 statusText = "下载完成 · 已保存到 Downloads/VideoDL"
                 currentPage = 1
             } catch (error: Exception) {
                 acceptProgress.set(false)
+                progress = null
+                currentPage = 0
                 statusText = "下载失败"
                 errorText = error.message ?: "下载过程中出现错误。"
             } finally {
                 acceptProgress.set(false)
-                temporaryDirectory?.let(LocalYtDlpEngine::cleanup)
+                val remainingDirectory = temporaryDirectory
+                if (remainingDirectory != null) {
+                    withContext(Dispatchers.IO) {
+                        LocalYtDlpEngine.cleanup(remainingDirectory)
+                    }
+                }
                 downloading = false
                 renderState()
             }
@@ -350,7 +385,16 @@ class MainActivity : ComponentActivity() {
 
     private data class SavedMedia(val uri: Uri, val displayName: String)
 
-    private fun saveIntoDownloads(context: Context, source: File, title: String): SavedMedia {
+    private fun saveIntoDownloads(
+        context: Context,
+        source: File,
+        title: String,
+        onCopyProgress: (copiedBytes: Long, totalBytes: Long) -> Unit
+    ): SavedMedia {
+        if (!source.isFile || source.length() <= 0L) {
+            throw IllegalStateException("下载文件不存在或大小为 0。")
+        }
+        val totalBytes = source.length()
         val extension = source.extension.ifBlank { "mp4" }
         val safeTitle = title.filterNot { it.isISOControl() }
             .replace(Regex("""[\\/:*?"<>|]"""), "_")
@@ -365,14 +409,26 @@ class MainActivity : ComponentActivity() {
         val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
             ?: throw IllegalStateException("无法创建系统下载文件")
         try {
-            val copiedBytes = source.inputStream().use { input ->
-                context.contentResolver.openOutputStream(uri, "w")?.use { output ->
-                    input.copyTo(output)
-                } ?: throw IllegalStateException("无法写入系统下载目录")
+            var copiedBytes = 0L
+            source.inputStream().use { input ->
+                val output = context.contentResolver.openOutputStream(uri, "w")
+                    ?: throw IllegalStateException("无法写入系统下载目录")
+                output.use { stream ->
+                    val buffer = ByteArray(128 * 1024)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        stream.write(buffer, 0, count)
+                        copiedBytes += count
+                        onCopyProgress(copiedBytes, totalBytes)
+                    }
+                    stream.flush()
+                }
             }
-            if (copiedBytes != source.length()) {
-                throw IllegalStateException("保存文件不完整：已写入 " + copiedBytes +
-                    " 字节，源文件为 " + source.length() + " 字节。")
+            if (copiedBytes != totalBytes) {
+                throw IllegalStateException(
+                    "保存文件不完整：已写入 " + copiedBytes + " 字节，源文件为 " + totalBytes + " 字节。"
+                )
             }
             val complete = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
             if (context.contentResolver.update(uri, complete, null, null) <= 0) {

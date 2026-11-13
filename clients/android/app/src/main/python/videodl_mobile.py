@@ -4,6 +4,7 @@ All extraction and media downloads run on the Android device.
 """
 from __future__ import annotations
 
+import glob
 import html
 import json
 import os
@@ -253,17 +254,64 @@ def inspect(raw_text):
     }, ensure_ascii=False)
 
 
+def _resolve_downloaded_file(ydl, info, directory, filename):
+    """Resolve the final media path even when yt-dlp changes its extension."""
+    candidates = []
+
+    def add_candidate(value):
+        if isinstance(value, str) and value:
+            candidates.append(value)
+
+    if isinstance(info, dict):
+        for field in ("filepath", "_filename", "filename"):
+            add_candidate(info.get(field))
+        for item in info.get("requested_downloads") or []:
+            if isinstance(item, dict):
+                for field in ("filepath", "_filename", "filename"):
+                    add_candidate(item.get(field))
+
+    try:
+        add_candidate(ydl.prepare_filename(info))
+    except Exception:
+        pass
+
+    ignored_suffixes = (
+        ".part", ".ytdl", ".temp", ".json", ".description",
+        ".jpg", ".jpeg", ".png", ".webp", ".vtt", ".srt", ".ass",
+    )
+    for candidate in candidates:
+        path = os.path.abspath(candidate)
+        if os.path.isfile(path) and os.path.getsize(path) > 0:
+            return path
+
+    # A postprocessor can replace the expected extension after the transfer.
+    for path in sorted(
+        glob.glob(os.path.join(directory, filename + ".*")),
+        key=os.path.getmtime,
+        reverse=True,
+    ):
+        if not os.path.isfile(path) or path.lower().endswith(ignored_suffixes):
+            continue
+        if os.path.getsize(path) > 0:
+            return path
+
+    raise RuntimeError("下载结束，但没有找到最终媒体文件（可能仍在封装或合并）。")
+
+
 def _download_one(url, format_id, directory, filename, listener, stage, progress_start=0.0, progress_span=95.0):
     template = os.path.join(directory, filename + ".%(ext)s")
 
     def progress_hook(data):
         if listener is None:
             return
-        if data.get("status") == "downloading":
-            raw = str(data.get("_percent_str") or "").replace("%", "").strip()
+        status = data.get("status")
+        if status == "downloading":
+            raw = str(data.get("_percent_str") or "")
+            raw = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", raw).replace("%", "").strip()
+            match = re.search(r"\d+(?:\.\d+)?", raw)
             try:
-                percent = float(re.sub(r"[^0-9.]", "", raw) or 0)
-            except ValueError:
+                percent = float(match.group(0)) if match else 0.0
+            except (TypeError, ValueError):
                 percent = 0.0
 
             if percent <= 0:
@@ -281,14 +329,32 @@ def _download_one(url, format_id, directory, filename, listener, stage, progress
             overall = min(95.0, progress_start + progress_span * percent / 100.0)
             eta = int(data.get("eta") or 0)
             speed = data.get("_speed_str") or ""
-            listener.onProgressUpdate(
-                overall,
-                eta,
-                stage + " · " + str(round(percent, 1)) + "% " + str(speed),
-            )
-        elif data.get("status") == "finished":
+            if percent >= 99.9:
+                message = stage + " · 数据接收完成，正在封装文件…"
+            else:
+                message = stage + " · " + str(round(percent, 1)) + "% " + str(speed)
+            listener.onProgressUpdate(overall, eta, message)
+        elif status == "finished":
             finished_at = min(95.0, progress_start + progress_span)
-            listener.onProgressUpdate(finished_at, 0, stage + "下载完成，正在校验文件…")
+            listener.onProgressUpdate(finished_at, 0, stage + "数据接收完成，正在校验文件…")
+
+    def postprocessor_hook(data):
+        if listener is None:
+            return
+        hook_status = str(data.get("status") or "")
+        processor = str(data.get("postprocessor") or "").replace("PP", "")
+        if hook_status == "started":
+            listener.onProgressUpdate(
+                min(97.0, progress_start + progress_span + 1.0),
+                0,
+                stage + " · 正在处理" + (processor or "媒体") + "…",
+            )
+        elif hook_status == "finished":
+            listener.onProgressUpdate(
+                min(97.0, progress_start + progress_span + 1.5),
+                0,
+                stage + " · 文件处理完成，正在校验…",
+            )
 
     options = {
         "format": format_id,
@@ -303,12 +369,11 @@ def _download_one(url, format_id, directory, filename, listener, stage, progress
         "concurrent_fragment_downloads": 4,
         "socket_timeout": 30,
         "progress_hooks": [progress_hook],
+        "postprocessor_hooks": [postprocessor_hook],
     }
     with yt_dlp.YoutubeDL(options) as ydl:
         info = ydl.extract_info(url, download=True)
-        path = ydl.prepare_filename(info)
-    if not os.path.isfile(path) or os.path.getsize(path) <= 0:
-        raise RuntimeError(stage + "下载结束，但没有找到输出文件。")
+        path = _resolve_downloaded_file(ydl, info, directory, filename)
     return path
 
 
