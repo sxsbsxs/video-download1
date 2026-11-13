@@ -18,7 +18,7 @@ RUN mkdir -p /tmp/videodl \
 USER appuser
 EXPOSE 8080
 
-# Task state is process-local. Keep one web worker so task creation, polling
-# and file retrieval share one in-memory registry. Downloads use a bounded
-# background ThreadPoolExecutor and can still execute concurrently.
+# SQLite persists task metadata and completed artifact references. Keep one
+# web worker because live executor state, cancellation events and rate limits
+# are process-local. Downloads still run concurrently in a bounded executor.
 CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 900 app:app"]

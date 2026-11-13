@@ -24,7 +24,7 @@ Do not treat the initial DNS validation as a substitute for network-level egress
 
 Each download receives its own temporary directory. Download workers are bounded by configuration, and queued tasks are also bounded. Failed/cancelled task directories are removed. Successful files are retained temporarily so clients can fetch them after polling reports completed.
 
-Task IDs are random UUID-derived identifiers, but the current API has no user authentication or ownership model. Anyone who obtains a task ID may query or fetch that task. Do not expose a shared instance to untrusted users without adding authentication and task ownership.
+The Android client generates a random per-installation owner token and stores it in private app preferences. The server stores only a SHA-256 digest of that token and uses it to scope the history-list endpoint. Raw owner tokens must not be written to logs. This token does not yet authorize the individual task status, cancellation or file endpoints; those endpoints still rely on the unguessable random task ID as a bearer capability. Do not publish task IDs or expose a shared instance to untrusted users without full task ownership checks and API authentication.
 
 ## Single-process state
 

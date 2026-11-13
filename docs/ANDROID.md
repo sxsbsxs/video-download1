@@ -13,7 +13,7 @@ The Android application is a Kotlin + Jetpack Compose client. It:
 7. Fetches the completed artifact and writes it to Downloads/VideoDL through MediaStore.
 8. Reads GET /api/tasks?limit=20 to display recent downloads, reconnects to unfinished tasks, and can save a completed server-side task again.
 
-The task identifier and main form values use Compose saveable state. When the activity is recreated and a task ID remains, the user can choose 恢复同步下载任务 to reconnect to the server-side task.
+The task identifier and main form values use Compose saveable state. The client also stores a random owner token in private app preferences; this token is sent only for task creation and history-list requests. When the activity is recreated and a task ID remains, the user can choose 恢复同步下载任务 to reconnect to the server-side task.
 
 ## Build
 

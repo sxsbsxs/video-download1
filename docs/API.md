@@ -34,6 +34,21 @@ Request:
 
 Response fields include id, title, thumbnail, duration, uploader, webpage_url, extractor and formats. Each format exposes an id and label; resolution entries may also include width, height, fps and extension. The response includes best and audio choices.
 
+## List recent tasks for one app installation
+
+`GET /api/tasks?limit=20`
+
+This endpoint requires an `X-VideoDL-Owner` header containing a random client-generated token between 32 and 256 characters. The server stores only its SHA-256 digest and returns tasks associated with that token. A missing token receives HTTP `401`; a malformed token receives HTTP `400`. The limit range is 1–100.
+
+Example:
+
+~~~bash
+curl -H "X-VideoDL-Owner: YOUR_RANDOM_DEVICE_TOKEN" \
+  "https://engine.example/api/tasks?limit=20"
+~~~
+
+Clients that omit the token can still create and use tasks by their unguessable task ID, but those tasks are not included in a device's history list.
+
 ## Create an asynchronous download task
 
 POST /api/tasks
@@ -46,6 +61,8 @@ Request:
   "quality": "1080"
 }
 ~~~
+
+When a client wants the task to appear in its private history list, it should also send the same `X-VideoDL-Owner` header used by the history endpoint.
 
 Quality values:
 
