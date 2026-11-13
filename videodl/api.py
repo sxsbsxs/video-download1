@@ -83,6 +83,17 @@ def register_routes(app) -> None:
             app.logger.warning("Info extraction failed: %s", error)
             return jsonify(error=public_error(error)), 422
 
+    @app.get("/api/tasks")
+    def list_download_tasks():
+        try:
+            limit = int(request.args.get("limit", "20"))
+        except (TypeError, ValueError):
+            return jsonify(error="limit 必须是 1 到 100 之间的整数。"), 400
+        if not 1 <= limit <= 100:
+            return jsonify(error="limit 必须是 1 到 100 之间的整数。"), 400
+        tasks = app.extensions["videodl.task_manager"].list_recent(limit)
+        return jsonify(tasks=tasks)
+
     @app.post("/api/tasks")
     def create_download_task():
         data = _payload()

@@ -47,6 +47,11 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
+    def test_task_history_rejects_invalid_limit(self):
+        self.assertEqual(self.client.get("/api/tasks?limit=0").status_code, 400)
+        self.assertEqual(self.client.get("/api/tasks?limit=101").status_code, 400)
+        self.assertEqual(self.client.get("/api/tasks?limit=nope").status_code, 400)
+
     def test_invalid_quality_rejected_before_queue(self):
         with patch("videodl.api.validate_public_url",
                    return_value="https://example.com/video"):
@@ -159,6 +164,11 @@ class AsyncTaskApiTests(unittest.TestCase):
         self.assertEqual(file_response.status_code, 200)
         self.assertEqual(file_response.data, b"sample-video")
         file_response.close()
+
+        history = self.client.get("/api/tasks?limit=10")
+        self.assertEqual(history.status_code, 200)
+        history_ids = [item["id"] for item in history.json["tasks"]]
+        self.assertIn(task_id, history_ids)
 
 
 if __name__ == "__main__":

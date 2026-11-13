@@ -275,6 +275,17 @@ class DownloadTaskManager:
                 if task.state not in TERMINAL_STATES
             ]
 
+    def list_recent(self, limit: int = 20) -> list[dict]:
+        self.prune_expired()
+        bounded_limit = max(1, min(int(limit), 100))
+        with self._lock:
+            recent = sorted(
+                self._tasks.values(),
+                key=lambda task: task.created_at,
+                reverse=True,
+            )[:bounded_limit]
+            return [self._snapshot(task) for task in recent]
+
     def cancel(self, task_id: str) -> dict:
         with self._lock:
             task = self._tasks.get(task_id)
