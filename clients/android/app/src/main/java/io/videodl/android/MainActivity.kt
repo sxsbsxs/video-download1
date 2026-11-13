@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,26 +27,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.ContentPaste
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.Movie
-import androidx.compose.material.icons.outlined.MusicNote
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
+import androidx.compose.material3.Divider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.lightColorScheme
@@ -67,6 +57,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,28 +86,28 @@ class MainActivity : ComponentActivity() {
 }
 
 private object VideoDLColors {
-    val background = Color(0xFFF3F4F0)
+    val background = Color(0xFFF8F9FA)
     val surface = Color(0xFFFFFFFF)
-    val ink = Color(0xFF171B18)
-    val muted = Color(0xFF737B73)
-    val line = Color(0xFFE4E8E1)
-    val lime = Color(0xFFD5F56B)
-    val limeSoft = Color(0xFFF0F8D9)
-    val error = Color(0xFFB3261E)
+    val blue = Color(0xFF1A73E8)
+    val blueSoft = Color(0xFFE8F0FE)
+    val ink = Color(0xFF202124)
+    val muted = Color(0xFF5F6368)
+    val line = Color(0xFFDADCE0)
+    val error = Color(0xFFD93025)
 }
 
 @Composable
 private fun VideoDLTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = lightColorScheme(
-            primary = VideoDLColors.lime,
-            onPrimary = VideoDLColors.ink,
-            secondary = Color(0xFF567044),
+            primary = VideoDLColors.blue,
+            onPrimary = Color.White,
+            secondary = VideoDLColors.blue,
             background = VideoDLColors.background,
             onBackground = VideoDLColors.ink,
             surface = VideoDLColors.surface,
             onSurface = VideoDLColors.ink,
-            surfaceVariant = Color(0xFFEBEEE8),
+            surfaceVariant = Color(0xFFF1F3F4),
             onSurfaceVariant = VideoDLColors.muted,
             outline = VideoDLColors.line,
             error = VideoDLColors.error
@@ -131,6 +122,53 @@ private data class SavedDownload(
     val savedAt: Long
 )
 
+private data class QualityGroup(
+    val key: String,
+    val width: Int,
+    val height: Int,
+    val fps: Double,
+    val dynamicRange: String,
+    val options: List<VideoFormat>
+) {
+    val preferred: VideoFormat get() = options.first()
+    val title: String get() = if (height > 0) "${height}P" else "视频"
+    val subtitle: String
+        get() = buildList {
+            if (width > 0 && height > 0) add("${width} × ${height}")
+            if (fps > 0) add("${fpsLabel(fps)} FPS")
+            if (dynamicRange.isNotBlank() && !dynamicRange.equals("SDR", true)) add(dynamicRange)
+        }.joinToString(" · ").ifBlank { preferred.technicalSummary }
+}
+
+private fun buildQualityGroups(formats: List<VideoFormat>): List<QualityGroup> {
+    return formats.groupBy { format ->
+        val fps = if (format.fps > 0) String.format(Locale.US, "%.2f", format.fps) else "0"
+        "${format.width}|${format.height}|\$fps|${format.dynamicRange.trim().lowercase(Locale.ROOT)}"
+    }.map { (key, options) ->
+        val sorted = options.sortedWith(
+            compareByDescending<VideoFormat> { it.bitrate }
+                .thenByDescending { it.fileSize }
+                .thenBy { it.extension }
+        )
+        val best = sorted.first()
+        QualityGroup(
+            key = key,
+            width = best.width,
+            height = best.height,
+            fps = best.fps,
+            dynamicRange = best.dynamicRange,
+            options = sorted
+        )
+    }.sortedWith(
+        compareByDescending<QualityGroup> { it.height }
+            .thenByDescending { it.fps }
+            .thenByDescending { it.width }
+    )
+}
+
+private fun fpsLabel(value: Double): String =
+    String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
+
 @Composable
 private fun VideoDLApp(initialText: String) {
     val context = LocalContext.current
@@ -140,17 +178,18 @@ private fun VideoDLApp(initialText: String) {
     var mediaInfo by remember { mutableStateOf<VideoInfo?>(null) }
     var selectedTab by rememberSaveable { mutableStateOf(0) }
     var selectedFormatKey by rememberSaveable { mutableStateOf("") }
+    var expandedGroups by remember { mutableStateOf(emptySet<String>()) }
     var analyzing by remember { mutableStateOf(false) }
     var downloading by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("粘贴视频链接，VideoDL 会直接在本机解析。") }
+    var status by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf("") }
     var progress by remember { mutableStateOf<Float?>(null) }
     var history by remember { mutableStateOf(loadHistory(context)) }
 
-    val visibleFormats = when (selectedTab) {
-        0 -> mediaInfo?.videoFormats.orEmpty()
-        else -> mediaInfo?.audioFormats.orEmpty()
-    }
+    val videoFormats = mediaInfo?.videoFormats.orEmpty()
+    val audioFormats = mediaInfo?.audioFormats.orEmpty()
+    val qualityGroups = remember(videoFormats) { buildQualityGroups(videoFormats) }
+    val visibleFormats = if (selectedTab == 0) videoFormats else audioFormats
     val selectedFormat = visibleFormats.firstOrNull { it.key == selectedFormatKey }
         ?: visibleFormats.firstOrNull()
 
@@ -160,317 +199,199 @@ private fun VideoDLApp(initialText: String) {
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "VideoDL",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = VideoDLColors.ink
-                        )
-                        Spacer(Modifier.width(9.dp))
-                        Surface(shape = RoundedCornerShape(50), color = VideoDLColors.limeSoft) {
-                            Text(
-                                "LOCAL",
-                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                color = Color(0xFF526A25),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                    Text(
-                        "VIDEO DOWNLOADER",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = VideoDLColors.muted,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = VideoDLColors.surface,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(shape = CircleShape, color = Color(0xFF7CA52B), modifier = Modifier.size(7.dp)) {}
-                        Spacer(Modifier.width(7.dp))
-                        Text("本机引擎", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
+            TopBar()
 
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
-                    "把喜欢的视频，\n保存到手机。",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = VideoDLColors.ink
+                    "下载视频",
+                    color = VideoDLColors.ink,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold
                 )
                 Text(
-                    "无需填写服务器地址。解析和下载都由本机完成。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = VideoDLColors.muted
+                    "粘贴视频链接，查看源站实际提供的画质。",
+                    color = VideoDLColors.muted,
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = VideoDLColors.surface,
-                shadowElevation = 1.dp
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Outlined.Link, null, tint = VideoDLColors.muted, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(7.dp))
-                            Text("视频链接", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                        }
-                        TextButton(
-                            onClick = {
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val copied = clipboard.primaryClip?.takeIf { it.itemCount > 0 }
-                                    ?.getItemAt(0)?.coerceToText(context)?.toString()
-                                if (!copied.isNullOrBlank()) {
-                                    input = copied
-                                    mediaInfo = null
-                                    selectedFormatKey = ""
-                                    errorText = ""
-                                }
-                            }
-                        ) {
-                            Icon(Icons.Outlined.ContentPaste, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("粘贴")
-                        }
+            LinkInputCard(
+                value = input,
+                onValueChange = {
+                    input = it
+                    mediaInfo = null
+                    selectedFormatKey = ""
+                    expandedGroups = emptySet()
+                    errorText = ""
+                    progress = null
+                },
+                analyzing = analyzing,
+                downloading = downloading,
+                onPaste = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val copied = clipboard.primaryClip
+                        ?.takeIf { it.itemCount > 0 }
+                        ?.getItemAt(0)
+                        ?.coerceToText(context)
+                        ?.toString()
+                    if (!copied.isNullOrBlank()) {
+                        input = copied
+                        mediaInfo = null
+                        selectedFormatKey = ""
+                        expandedGroups = emptySet()
+                        errorText = ""
                     }
-                    OutlinedTextField(
-                        value = input,
-                        onValueChange = {
-                            input = it
+                },
+                onAnalyze = {
+                    scope.launch {
+                        analyzing = true
+                        downloading = false
+                        progress = null
+                        errorText = ""
+                        status = ""
+                        try {
+                            val result = LocalYtDlpEngine.inspect(context, input)
+                            mediaInfo = result
+                            selectedTab = if (result.videoFormats.isNotEmpty()) 0 else 1
+                            selectedFormatKey = result.videoFormats.firstOrNull()?.key
+                                ?: result.audioFormats.firstOrNull()?.key.orEmpty()
+                            expandedGroups = emptySet()
+                            input = result.sourceUrl
+                            status = "已读取源站返回的 ${result.videoFormats.size + result.audioFormats.size} 种原始格式"
+                        } catch (error: Exception) {
                             mediaInfo = null
-                            selectedFormatKey = ""
-                            errorText = ""
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("粘贴链接，或包含链接的分享文案") },
-                        minLines = 2,
-                        maxLines = 4,
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                analyzing = true
-                                downloading = false
-                                errorText = ""
-                                progress = null
-                                status = "正在连接视频来源并读取媒体信息…"
-                                try {
-                                    val result = LocalYtDlpEngine.inspect(context, input)
-                                    mediaInfo = result
-                                    selectedTab = if (result.videoFormats.isNotEmpty()) 0 else 1
-                                    selectedFormatKey = result.videoFormats.firstOrNull()?.key
-                                        ?: result.audioFormats.firstOrNull()?.key.orEmpty()
-                                    input = result.sourceUrl
-                                    status = "解析完成 · 找到 ${result.videoFormats.size} 种视频格式和 ${result.audioFormats.size} 种音频格式"
-                                } catch (error: Exception) {
-                                    mediaInfo = null
-                                    status = "解析失败"
-                                    errorText = error.message ?: "无法读取该视频，请检查链接后重试。"
-                                } finally {
-                                    analyzing = false
-                                }
-                            }
-                        },
-                        enabled = input.isNotBlank() && !analyzing && !downloading,
-                        modifier = Modifier.fillMaxWidth().height(54.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = VideoDLColors.ink,
-                            contentColor = Color.White,
-                            disabledContainerColor = Color(0xFFB8BEB6),
-                            disabledContentColor = Color.White
-                        )
-                    ) {
-                        if (analyzing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = Color.White
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text("正在解析…", fontWeight = FontWeight.SemiBold)
-                        } else {
-                            Icon(Icons.Outlined.Search, null, modifier = Modifier.size(19.dp))
-                            Spacer(Modifier.width(9.dp))
-                            Text("解析视频", fontWeight = FontWeight.SemiBold)
+                            status = "解析失败"
+                            errorText = error.message ?: "无法读取该视频，请检查链接后重试。"
+                        } finally {
+                            analyzing = false
                         }
                     }
-                    if (errorText.isNotBlank()) {
-                        Text(errorText, color = VideoDLColors.error, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
+                },
+                errorText = errorText
+            )
 
             mediaInfo?.let { info ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(22.dp),
-                    color = VideoDLColors.surface,
-                    shadowElevation = 1.dp
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(11.dp)
-                    ) {
-                        if (!info.thumbnail.isNullOrBlank()) {
-                            AsyncImage(
-                                model = info.thumbnail,
-                                contentDescription = "视频封面",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxWidth()
-                                    .aspectRatio(16f / 9f)
-                                    .clip(RoundedCornerShape(15.dp))
-                            )
-                        } else {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-                                shape = RoundedCornerShape(15.dp),
-                                color = Color(0xFFE8ECE5)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.Outlined.Movie, null, tint = Color(0xFF9AA497), modifier = Modifier.size(48.dp))
-                                }
-                            }
-                        }
-                        Text(
-                            info.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            if (info.uploader.isNotBlank()) {
-                                Text(
-                                    info.uploader,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = VideoDLColors.muted,
-                                    maxLines = 1,
-                                    modifier = Modifier.weight(1f),
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (info.durationSeconds > 0) {
-                                Text(
-                                    formatDuration(info.durationSeconds),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = VideoDLColors.muted
-                                )
-                            }
-                        }
-                    }
-                }
+                VideoSummaryCard(info)
 
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.Bottom
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("选择下载格式", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text(
-                                "显示来源实际提供的清晰度与编码",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = VideoDLColors.muted
+                                "选择画质",
+                                color = VideoDLColors.ink,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "只显示这个视频真实可下载的格式",
+                                color = VideoDLColors.muted,
+                                style = MaterialTheme.typography.bodySmall
                             )
                         }
                         Text(
-                            "${visibleFormats.size} 个选项",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = VideoDLColors.muted
+                            "${visibleFormats.size} 种格式",
+                            color = VideoDLColors.muted,
+                            style = MaterialTheme.typography.labelMedium
                         )
                     }
+
+                    FormatTypeSelector(
+                        selectedTab = selectedTab,
+                        videoCount = videoFormats.size,
+                        audioCount = audioFormats.size,
+                        onSelect = { tab ->
+                            selectedTab = tab
+                            selectedFormatKey = if (tab == 0) {
+                                videoFormats.firstOrNull()?.key.orEmpty()
+                            } else {
+                                audioFormats.firstOrNull()?.key.orEmpty()
+                            }
+                        }
+                    )
 
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
-                        color = VideoDLColors.surface
+                        color = VideoDLColors.surface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, VideoDLColors.line)
                     ) {
                         Column {
-                            TabRow(
-                                selectedTabIndex = selectedTab,
-                                containerColor = VideoDLColors.surface,
-                                contentColor = VideoDLColors.ink
-                            ) {
-                                Tab(
-                                    selected = selectedTab == 0,
-                                    onClick = {
-                                        selectedTab = 0
-                                        selectedFormatKey = info.videoFormats.firstOrNull()?.key.orEmpty()
-                                    },
-                                    text = { Text("视频  ${info.videoFormats.size}", fontWeight = FontWeight.SemiBold) },
-                                    icon = { Icon(Icons.Outlined.Movie, null, modifier = Modifier.size(17.dp)) }
-                                )
-                                Tab(
-                                    selected = selectedTab == 1,
-                                    onClick = {
-                                        selectedTab = 1
-                                        selectedFormatKey = info.audioFormats.firstOrNull()?.key.orEmpty()
-                                    },
-                                    text = { Text("音频  ${info.audioFormats.size}", fontWeight = FontWeight.SemiBold) },
-                                    icon = { Icon(Icons.Outlined.MusicNote, null, modifier = Modifier.size(17.dp)) }
-                                )
-                            }
-
-                            if (visibleFormats.isEmpty()) {
+                            if (selectedTab == 0 && qualityGroups.isNotEmpty()) {
+                                qualityGroups.forEachIndexed { index, group ->
+                                    QualityGroupRow(
+                                        group = group,
+                                        selected = group.options.any { it.key == selectedFormatKey },
+                                        expanded = group.key in expandedGroups,
+                                        onSelect = { selectedFormatKey = group.preferred.key },
+                                        onToggleExpanded = {
+                                            expandedGroups = if (group.key in expandedGroups) {
+                                                expandedGroups - group.key
+                                            } else {
+                                                expandedGroups + group.key
+                                            }
+                                        }
+                                    )
+                                    if (group.key in expandedGroups) {
+                                        group.options.forEach { option ->
+                                            FormatVariantRow(
+                                                option = option,
+                                                selected = option.key == selectedFormatKey,
+                                                onSelect = { selectedFormatKey = option.key }
+                                            )
+                                        }
+                                    }
+                                    if (index != qualityGroups.lastIndex) {
+                                        Divider(
+                                            modifier = Modifier.padding(horizontal = 14.dp),
+                                            color = VideoDLColors.line,
+                                            thickness = 1.dp
+                                        )
+                                    }
+                                }
+                            } else if (selectedTab == 1 && audioFormats.isNotEmpty()) {
+                                audioFormats.forEachIndexed { index, option ->
+                                    FormatVariantRow(
+                                        option = option,
+                                        selected = option.key == selectedFormatKey,
+                                        onSelect = { selectedFormatKey = option.key },
+                                        compact = false
+                                    )
+                                    if (index != audioFormats.lastIndex) {
+                                        Divider(
+                                            modifier = Modifier.padding(horizontal = 14.dp),
+                                            color = VideoDLColors.line,
+                                            thickness = 1.dp
+                                        )
+                                    }
+                                }
+                            } else {
                                 Text(
-                                    if (selectedTab == 0) "来源没有提供可用的视频格式" else "来源没有提供独立音频格式",
+                                    if (selectedTab == 0) "这个来源没有提供可用的视频流。"
+                                    else "这个来源没有提供独立音频格式。",
                                     modifier = Modifier.padding(18.dp),
                                     color = VideoDLColors.muted,
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                            } else {
-                                Column(
-                                    modifier = Modifier.padding(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(5.dp)
-                                ) {
-                                    visibleFormats.forEach { format ->
-                                        FormatOptionRow(
-                                            option = format,
-                                            selected = format.key == (selectedFormat?.key ?: selectedFormatKey),
-                                            onClick = { selectedFormatKey = format.key }
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
+
+                    Text(
+                        "分辨率、帧率、HDR、编码和格式 ID 均来自源站解析结果；标注“约”的体积是来源估算值。",
+                        color = VideoDLColors.muted,
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
 
                 Button(
                     onClick = {
-                        val chosen = selectedFormat
-                        if (chosen == null) return@Button
+                        val chosen = selectedFormat ?: return@Button
                         scope.launch {
                             downloading = true
                             progress = 0f
@@ -491,7 +412,7 @@ private fun VideoDLApp(initialText: String) {
                                     format = chosen,
                                     listener = listener
                                 )
-                                status = "正在保存到手机 Downloads/VideoDL…"
+                                status = "正在保存到 Downloads/VideoDL…"
                                 val savedName = withContext(Dispatchers.IO) {
                                     saveIntoDownloads(context, file, info.title)
                                 }
@@ -501,7 +422,7 @@ private fun VideoDLApp(initialText: String) {
                                 storeHistory(context, history)
                                 LocalYtDlpEngine.cleanup(file.parentFile)
                                 progress = 100f
-                                status = "下载完成，已保存到 Downloads/VideoDL"
+                                status = "下载完成 · 已保存到 Downloads/VideoDL"
                             } catch (error: Exception) {
                                 status = "下载失败"
                                 errorText = error.message ?: "下载过程中出现错误。"
@@ -511,182 +432,484 @@ private fun VideoDLApp(initialText: String) {
                         }
                     },
                     enabled = selectedFormat != null && !downloading && !analyzing,
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(17.dp),
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = VideoDLColors.lime,
-                        contentColor = VideoDLColors.ink,
-                        disabledContainerColor = Color(0xFFDDE2D9),
+                        containerColor = VideoDLColors.blue,
+                        contentColor = Color.White,
+                        disabledContainerColor = Color(0xFFE8EAED),
                         disabledContentColor = VideoDLColors.muted
                     )
                 ) {
                     if (downloading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(18.dp),
-                            color = VideoDLColors.ink,
-                            strokeWidth = 2.dp
+                            strokeWidth = 2.dp,
+                            color = Color.White
                         )
-                        Spacer(Modifier.width(10.dp))
-                        Text("下载中…", fontWeight = FontWeight.Bold)
-                    } else {
-                        Icon(Icons.Outlined.Download, null)
                         Spacer(Modifier.width(9.dp))
-                        Text("下载到手机", fontWeight = FontWeight.Bold)
+                        Text("正在下载…", fontWeight = FontWeight.SemiBold)
+                    } else {
+                        Text("下载到手机", fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
 
             if (downloading || progress != null) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    color = VideoDLColors.surface
-                ) {
-                    Column(
-                        modifier = Modifier.padding(15.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                status,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = VideoDLColors.ink,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (progress != null) {
-                                Text(
-                                    "${progress!!.toInt()}%",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        LinearProgressIndicator(
-                            progress = { (progress ?: 0f) / 100f },
-                            modifier = Modifier.fillMaxWidth(),
-                            color = Color(0xFF7CA52B),
-                            trackColor = Color(0xFFE5EADF)
-                        )
-                    }
-                }
-            } else if (mediaInfo == null && errorText.isBlank()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Outlined.CheckCircle, null, tint = Color(0xFF7B9860), modifier = Modifier.size(17.dp))
-                    Spacer(Modifier.width(7.dp))
-                    Text(status, color = VideoDLColors.muted, style = MaterialTheme.typography.bodySmall)
-                }
+                DownloadProgressCard(status = status, progress = progress ?: 0f)
+            }
+
+            if (errorText.isNotBlank() && mediaInfo != null) {
+                Text(
+                    errorText,
+                    color = VideoDLColors.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
 
             if (history.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("最近保存", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.weight(1f))
-                        Text("${history.size} 项", color = VideoDLColors.muted, style = MaterialTheme.typography.labelSmall)
-                    }
-                    history.take(5).forEach { item ->
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            color = VideoDLColors.surface
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(13.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(11.dp),
-                                    color = VideoDLColors.limeSoft,
-                                    modifier = Modifier.size(38.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(Icons.Outlined.CheckCircle, null, tint = Color(0xFF567044))
-                                    }
-                                }
-                                Spacer(Modifier.width(11.dp))
-                                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                                    Text(item.fileName, style = MaterialTheme.typography.bodySmall, color = VideoDLColors.muted)
-                                }
-                                Text(
-                                    SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(item.savedAt)),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = VideoDLColors.muted
-                                )
-                            }
-                        }
-                    }
-                }
+                RecentDownloads(history = history.take(5))
             }
 
             Text(
                 "请仅下载你拥有版权、已获授权或平台允许下载的内容。",
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 12.dp),
-                style = MaterialTheme.typography.labelSmall,
-                color = VideoDLColors.muted
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp),
+                color = VideoDLColors.muted,
+                style = MaterialTheme.typography.labelSmall
             )
         }
     }
 }
 
 @Composable
-private fun FormatOptionRow(
-    option: VideoFormat,
-    selected: Boolean,
-    onClick: () -> Unit
+private fun TopBar() {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(VideoDLColors.blue),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("▶", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            "VideoDL",
+            color = VideoDLColors.ink,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.weight(1f))
+        Text(
+            "视频下载器",
+            color = VideoDLColors.muted,
+            style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
+@Composable
+private fun LinkInputCard(
+    value: String,
+    onValueChange: (String) -> Unit,
+    analyzing: Boolean,
+    downloading: Boolean,
+    onPaste: () -> Unit,
+    onAnalyze: () -> Unit,
+    errorText: String
 ) {
-    val bg = if (selected) VideoDLColors.limeSoft else VideoDLColors.surface
-    val stroke = if (selected) Color(0xFFB8D96B) else Color.Transparent
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = VideoDLColors.surface,
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, VideoDLColors.line)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "视频链接",
+                    color = VideoDLColors.ink,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onPaste, enabled = !analyzing && !downloading) {
+                    Text("粘贴", color = VideoDLColors.blue, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("粘贴链接，或包含链接的分享文案") },
+                minLines = 2,
+                maxLines = 4,
+                shape = RoundedCornerShape(13.dp),
+                enabled = !analyzing && !downloading,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = VideoDLColors.blue,
+                    unfocusedBorderColor = VideoDLColors.line,
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
+                    cursorColor = VideoDLColors.blue
+                )
+            )
+            Button(
+                onClick = onAnalyze,
+                enabled = value.isNotBlank() && !analyzing && !downloading,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(13.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = VideoDLColors.blue,
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFE8EAED),
+                    disabledContentColor = VideoDLColors.muted
+                )
+            ) {
+                if (analyzing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(17.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.White
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("正在解析…")
+                } else {
+                    Text("获取视频信息", fontWeight = FontWeight.SemiBold)
+                }
+            }
+            if (errorText.isNotBlank() && !analyzing) {
+                Text(
+                    errorText,
+                    color = VideoDLColors.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VideoSummaryCard(info: VideoInfo) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = VideoDLColors.surface,
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, VideoDLColors.line)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (!info.thumbnail.isNullOrBlank()) {
+                AsyncImage(
+                    model = info.thumbnail,
+                    contentDescription = "视频封面",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .width(116.dp)
+                        .height(78.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .width(116.dp)
+                        .height(78.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(Color(0xFFF1F3F4)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("VIDEO", color = VideoDLColors.muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Text(
+                    info.title,
+                    color = VideoDLColors.ink,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (info.uploader.isNotBlank()) {
+                    Text(
+                        info.uploader,
+                        color = VideoDLColors.muted,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (info.durationSeconds > 0) {
+                    Text(
+                        formatDuration(info.durationSeconds),
+                        color = VideoDLColors.muted,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FormatTypeSelector(
+    selectedTab: Int,
+    videoCount: Int,
+    audioCount: Int,
+    onSelect: (Int) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(bg)
-            .border(1.dp, stroke, RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .background(Color(0xFFEFF1F3))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        listOf("视频  $videoCount", "音频  $audioCount").forEachIndexed { index, label ->
+            val selected = selectedTab == index
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(if (selected) Color.White else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    label,
+                    color = if (selected) VideoDLColors.blue else VideoDLColors.muted,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QualityGroupRow(
+    group: QualityGroup,
+    selected: Boolean,
+    expanded: Boolean,
+    onSelect: () -> Unit,
+    onToggleExpanded: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+            .padding(horizontal = 10.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Surface(
-            shape = RoundedCornerShape(9.dp),
-            color = if (selected) VideoDLColors.lime else Color(0xFFF0F2ED)
+        RadioButton(selected = selected, onClick = onSelect, modifier = Modifier.size(42.dp))
+        Spacer(Modifier.width(5.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Text(
-                option.primaryLabel,
-                modifier = Modifier.padding(horizontal = 9.dp, vertical = 7.dp),
+                group.title,
                 color = VideoDLColors.ink,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.labelMedium
-            )
-        }
-        Spacer(Modifier.width(11.dp))
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                option.secondaryLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = VideoDLColors.ink,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                option.detailLabel,
-                style = MaterialTheme.typography.labelSmall,
+                group.subtitle,
                 color = VideoDLColors.muted,
-                maxLines = 1,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (group.options.size > 1) {
+                TextButton(
+                    onClick = onToggleExpanded,
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Text(
+                        if (expanded) "收起其他格式" else "其他编码格式 ${group.options.size - 1} 个",
+                        color = VideoDLColors.blue,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(
+            group.preferred.sizeLabel,
+            color = VideoDLColors.muted,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+@Composable
+private fun FormatVariantRow(
+    option: VideoFormat,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    compact: Boolean = true
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+            .padding(
+                start = if (compact) 49.dp else 10.dp,
+                end = 12.dp,
+                top = 9.dp,
+                bottom = 9.dp
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onSelect, modifier = Modifier.size(40.dp))
+        Spacer(Modifier.width(6.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                option.primaryLabel,
+                color = VideoDLColors.ink,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                option.technicalSummary,
+                color = VideoDLColors.muted,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
         }
-        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(option.sizeLabel, style = MaterialTheme.typography.labelSmall, color = VideoDLColors.muted)
-            if (selected) {
-                Icon(Icons.Outlined.CheckCircle, null, tint = Color(0xFF5B7B2E), modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(5.dp))
+        Text(
+            option.sizeLabel,
+            color = VideoDLColors.muted,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+@Composable
+private fun DownloadProgressCard(status: String, progress: Float) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = VideoDLColors.surface,
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, VideoDLColors.line)
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    status,
+                    modifier = Modifier.weight(1f),
+                    color = VideoDLColors.ink,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "${progress.toInt()}%",
+                    color = VideoDLColors.blue,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            LinearProgressIndicator(
+                progress = { (progress / 100f).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth(),
+                color = VideoDLColors.blue,
+                trackColor = Color(0xFFE8EAED)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RecentDownloads(history: List<SavedDownload>) {
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        Text(
+            "最近下载",
+            color = VideoDLColors.ink,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = VideoDLColors.surface,
+            shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, VideoDLColors.line)
+        ) {
+            Column {
+                history.forEachIndexed { index, item ->
+                    Row(
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(VideoDLColors.blueSoft),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("↓", color = VideoDLColors.blue, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.width(11.dp))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                item.title,
+                                color = VideoDLColors.ink,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                item.fileName,
+                                color = VideoDLColors.muted,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Text(
+                            SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(item.savedAt)),
+                            color = VideoDLColors.muted,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    if (index != history.lastIndex) {
+                        Divider(
+                            modifier = Modifier.padding(start = 58.dp, end = 12.dp),
+                            color = VideoDLColors.line
+                        )
+                    }
+                }
             }
         }
     }

@@ -40,11 +40,14 @@ jobs:
           gradle-version: "8.9"
       - name: Validate embedded yt-dlp bridge
         run: python -m py_compile clients/android/app/src/main/python/videodl_mobile.py
-      - run: gradle -p clients/android assembleDebug
+      - name: Build ARM64 Android APK
+        run: gradle -p clients/android assembleDebug
+      - name: Report APK file size
+        run: python -c "from pathlib import Path; p=Path('clients/android/app/build/outputs/apk/debug/app-debug.apk'); print(f'APK_SIZE_BYTES={p.stat().st_size}'); print(f'APK_SIZE_MIB={p.stat().st_size / 1024 / 1024:.2f}')"
       - name: Upload Android debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: VideoDL-Android-debug
+          name: VideoDL-Android-arm64-debug
           path: clients/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
 
@@ -113,7 +116,6 @@ jobs:
   csharp:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0.x"

@@ -67,8 +67,30 @@ def extract_video_url(raw: str) -> str:
     return candidates[0]
 
 
+def _size_info(fmt):
+    exact = fmt.get("filesize")
+    if exact:
+        return int(exact), False
+    approximate = fmt.get("filesize_approx")
+    if approximate:
+        return int(approximate), True
+    return 0, False
+
+
 def _file_size(fmt):
-    return int(fmt.get("filesize") or fmt.get("filesize_approx") or 0)
+    return _size_info(fmt)[0]
+
+
+def _combined_size(video_format, audio_format):
+    video_size, video_approx = _size_info(video_format)
+    if audio_format is None:
+        return video_size, video_approx
+
+    audio_size, audio_approx = _size_info(audio_format)
+    # Never report a partial stream size as if it were the merged file size.
+    if video_size <= 0 or audio_size <= 0:
+        return 0, False
+    return video_size + audio_size, video_approx or audio_approx
 
 
 def _best_audio(formats):
@@ -118,36 +140,46 @@ def inspect(raw_text):
             height = int(item.get("height") or 0)
             if height <= 0:
                 continue
-            audio_id = None
+            audio_format = None
+            audio_id = ""
             selected_audio_codec = acodec
             if acodec == "none":
                 if best_audio is None:
                     continue
-                audio_id = str(best_audio.get("format_id"))
+                audio_format = best_audio
+                audio_id = str(best_audio.get("format_id") or "")
                 selected_audio_codec = str(best_audio.get("acodec") or "")
+            total_size, size_is_approx = _combined_size(item, audio_format)
             video_options.append({
                 "key": "v:" + format_id,
                 "format_id": format_id,
-                "audio_format_id": audio_id or "",
+                "audio_format_id": audio_id,
+                "width": int(item.get("width") or 0),
                 "height": height,
                 "fps": float(item.get("fps") or 0),
+                "dynamic_range": str(item.get("dynamic_range") or ""),
                 "ext": ext,
                 "vcodec": vcodec,
                 "acodec": selected_audio_codec,
-                "filesize": _file_size(item) + (_file_size(best_audio) if audio_id and best_audio else 0),
+                "filesize": total_size,
+                "filesize_is_approx": size_is_approx,
                 "bitrate": float(item.get("tbr") or 0),
             })
         elif acodec != "none":
+            size, size_approx = _size_info(item)
             audio_options.append({
                 "key": "a:" + format_id,
                 "format_id": format_id,
                 "audio_format_id": "",
+                "width": 0,
                 "height": 0,
                 "fps": 0,
+                "dynamic_range": "",
                 "ext": ext,
                 "vcodec": "",
                 "acodec": acodec,
-                "filesize": _file_size(item),
+                "filesize": size,
+                "filesize_is_approx": size_approx,
                 "bitrate": float(item.get("abr") or item.get("tbr") or 0),
             })
 

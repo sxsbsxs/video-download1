@@ -1,95 +1,81 @@
 # VideoDL — 多平台视频下载应用
 
-VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。Android App 内置 Python + yt-dlp 引擎，直接在手机上解析并下载媒体，不需要填写服务地址、不需要部署 VideoDL API，也不需要购买服务器。项目同时保留可选的 Python 服务端，供其他语言客户端或自建集成使用；它不是 Android App 的运行前提。
+VideoDL 以 Android 原生应用为主。Android App 内置 Python + yt-dlp 引擎，直接在手机上解析并下载媒体，不需要填写服务器地址、不需要部署 VideoDL API，也不需要租用服务器。仓库同时保留可选 Python 服务端和桌面/命令行客户端，均不是 Android App 的运行前提。
 
 > 仅下载你拥有版权、已获授权或平台明确允许下载的内容。请遵守目标网站服务条款与当地法律。本项目不提供 DRM、付费墙或访问控制绕过功能。
+
+## Android 版本
+
+- Kotlin + Jetpack Compose 原生界面，采用清爽的 Google Material 风格。
+- Chaquopy 内嵌 Python 3.13 和 yt-dlp，视频解析及下载在手机本机进行。
+- 支持粘贴 URL、分享文案提取唯一链接、Android 系统分享和 HTTP(S) 链接打开。
+- 画质选项由 yt-dlp 返回的源站格式列表生成，不写死 720p、1080p 或 4K。
+- 展示来源实际提供的分辨率、帧率、动态范围/HDR（来源有提供时）、编码、封装格式、格式 ID 和文件大小。
+- 同一分辨率有多个实际编码或容器版本时，可展开选择。
+- 估算大小明确标注“约”；只知道分离流其中一段的大小时显示“大小未知”，不伪造完整文件体积。
+- 视频、音频分开选择；分离流在设备本地通过 FFmpeg 做无损流复制封装。
+- 下载完成后保存到系统 Downloads/VideoDL，并保留最近下载记录。
+
+## APK 体积
+
+Android 手机分发包仅构建 arm64-v8a，不再同时打包 x86_64 的 Python 与 native 库；FFmpeg 由 full 改为 minimal 变体，因为当前合并流程仅执行 stream copy，不需要可选音视频编码器。移除了 Material Icons Extended 图标全集和 debug UI tooling 依赖。不会为了缩小安装包而删除画质或降低下载分辨率。
+
+注意：ARM64-only APK 适用于绝大多数现代 Android 手机，不适用于 x86_64 Android 模拟器。实际 APK 字节数由 GitHub Actions 构建日志报告。
 
 ## 技术分工
 
 | 技术 | 实际职责 |
 |---|---|
-| Kotlin + Jetpack Compose | Android 原生 UI、动态格式选择、本地下载进度、保存到系统 Downloads |
-| Chaquopy + Python + yt-dlp | Android APK 内置的站点提取、元数据、真实格式清单与本地下载引擎 |
-| FFmpegKit | Android 本机音视频流合并与媒体封装 |
-| Flask + Python + yt-dlp | 可选服务端接口，供桌面/自动化客户端使用，不是 Android App 的前置条件 |
-| C11 + libcurl | 可复用网络 SDK、响应边界限制、下载流式写盘、传输进度、取消、原子文件落盘 |
-| C++17 | 更高层原生客户端，复用 C SDK，不再复制一套 HTTP 传输逻辑 |
-| Rust | 跨平台任务状态机、进度计算、质量解析和安全文件名规则 |
-| Java | JVM 命令行/自动化客户端 |
-| SwiftUI | macOS 原生客户端 |
+| Kotlin + Jetpack Compose | Android 原生 UI、格式选择、下载进度、保存到系统 Downloads |
+| Chaquopy + Python + yt-dlp | Android 内置媒体站点解析和本机下载引擎 |
+| FFmpegKit minimal | Android 本地 MP4/MKV 音视频流复制封装 |
+| Flask + Python + yt-dlp | 可选服务端，供桌面或自动化客户端使用 |
+| C11 + libcurl | 可复用流式网络 SDK、进度、取消、TLS 与原子文件落盘 |
+| C++17 | 复用 C11 网络 SDK 的客户端 |
+| Rust | 跨平台任务状态机、进度和质量核心 |
+| Java | JVM 命令行客户端 |
+| SwiftUI | macOS 客户端 |
 | C# + Avalonia | 桌面客户端 |
-
-## 现在有的真实功能
-
-- 公开媒体 URL 校验和基本 SSRF 防护。
-- yt-dlp 元数据解析：标题、封面、作者、时长、可用分辨率。
-- 链接识别：可以直接粘贴 URL，也可以粘贴包含 URL 的整段分享文案、Markdown 链接或带中文标点的文本；自动提取唯一链接后再做 URL 安全校验。
-- Android 支持从其他应用接收文本分享和直接打开 http(s) 链接；解析完成后会将输入框自动替换为识别出的干净 URL。
-- 可选 Flask API 服务端，供非 Android 客户端使用；Android App 不依赖它。
-- 后台任务队列：任务 ID、排队、解析、下载、处理、完成、失败和取消状态。
-- 任务状态查询接口，包含已下载字节、总字节、速度、ETA 和百分比。
-- SQLite 保存任务元数据和完成文件索引；服务重启后可恢复历史状态，未完成任务会明确标记为中断。
-- Android 内置 yt-dlp：在本机解析公开媒体链接，读取来源真实提供的所有视频/音频格式。
-- Android 格式列表展示实际分辨率、帧率、编码、封装格式和估算体积；视频与音频可分开选择。
-- Android 直接在设备上下载，必要时由本机 FFmpeg 合并音视频流，完成后写入 Downloads/VideoDL。
-- Android 支持接收其他应用分享的文本/链接，以及自动识别分享文案中的视频链接。
-- C11 SDK 支持流式写文件、进度回调、取消、TLS 校验、临时文件和成功后原子重命名。
-- C++ 客户端复用 C11 SDK。
-- Python、C、Rust 等模块有独立测试；GitHub Actions 构建 Android、C、C++、Java、Rust、Swift 和 C#。
-
-**目前还没有完成：** Android WorkManager 长时间后台常驻下载、任务断点续传、登录态/cookie 导入和 DRM 处理。Android 端当前下载由应用进程执行；应用被系统强制结束时，不承诺自动续跑。
 
 ## 目录结构
 
 ~~~text
 .
-├── app.py                         # WSGI 入口
-├── videodl/
-│   ├── app_factory.py              # Flask 应用工厂、依赖装配
-│   ├── api.py                      # API 路由和响应格式
-│   ├── config.py                   # 环境变量与运行配置
-│   ├── security.py                 # URL 与 IP 安全校验
-│   ├── quality.py                  # 画质解析和 yt-dlp 格式选择
-│   ├── engine.py                   # yt-dlp/FFmpeg 引擎适配器
-│   ├── tasks.py                    # 有界任务队列和任务状态
-│   ├── task_store.py               # SQLite 任务元数据仓库
-│   ├── rate_limit.py               # 进程内滑动窗口限流
-│   └── errors.py                   # 业务错误与用户安全提示
+├── app.py
+├── videodl/                       # 可选 Python 服务端 API
 ├── clients/
-│   ├── android/                    # Kotlin Android App
-│   ├── apple/                      # SwiftUI macOS App
-│   ├── desktop/                    # C# Avalonia App
-│   ├── cpp/                        # C++17 客户端
-│   ├── java/                       # Java 客户端
-│   └── rust/                       # Rust 客户端
+│   ├── android/                   # Android 原生应用
+│   ├── apple/                     # SwiftUI macOS 客户端
+│   ├── desktop/                   # C# Avalonia 客户端
+│   ├── cpp/                       # C++17 客户端
+│   ├── java/                      # Java CLI
+│   └── rust/                      # Rust CLI
 ├── native/
-│   ├── c-client/                   # C11 SDK、CLI、单元测试
-│   └── rust-core/                  # Rust 任务核心
-├── tests/                          # Python 单元和 API 测试
-├── docs/
-│   ├── API.md                      # API 请求、状态和错误定义
-│   ├── ARCHITECTURE.md             # 模块边界和数据流
-│   ├── ANDROID.md                  # Android 客户端说明
-│   ├── DEPLOYMENT.md               # 单实例部署说明
-│   ├── TROUBLESHOOTING.md          # 状态同步和故障排查
-│   ├── SECURITY.md                 # 威胁模型和部署注意事项
-│   └── ROADMAP.md                  # 未完成工作和优先级
-├── .github/workflows/              # 自动测试和多语言构建
-├── Makefile                        # 常用构建和测试入口
-└── Dockerfile                      # Python 引擎容器
+│   ├── c-client/                  # C11 SDK、CLI 与测试
+│   └── rust-core/                 # Rust 任务核心
+├── tests/
+└── .github/workflows/             # 自动测试和多语言构建
 ~~~
 
-## Android 本地运行
+## Android 构建
 
-Android APK 内置 Chaquopy、Python 3.13 和 yt-dlp；解析与下载直接在手机上进行，完成后保存至 `Downloads/VideoDL`。不需要创建服务器、不需要配置 API 地址。手机只需能访问对应的视频来源网站。
+需要 Python 3.13、JDK 17、Android SDK 和 Gradle 8.9。可在 Android Studio 打开 clients/android，或在项目根目录运行：
 
-画质菜单不是写死的四档，而是显示来源站点实际返回的格式；可按视频或音频类型选择，并展示分辨率、帧率、编码、容器和估算体积。来源若提供分离的视频/音频流，应用会在手机上下载并通过 FFmpegKit 合并。
+~~~bash
+gradle -p clients/android assembleDebug
+~~~
 
-Android 构建说明见 [docs/ANDROID.md](docs/ANDROID.md)，第三方组件许可见 [clients/android/THIRD_PARTY_NOTICES.md](clients/android/THIRD_PARTY_NOTICES.md)。
+APK 输出位置：
 
-## 可选：启动 Python API 服务（Android 不需要）
+~~~text
+clients/android/app/build/outputs/apk/debug/app-debug.apk
+~~~
 
-需要 Python 3.12+ 和 FFmpeg：
+完整构建说明见 docs/ANDROID.md；第三方组件许可证见 clients/android/THIRD_PARTY_NOTICES.md。
+
+## 可选 Python API
+
+Android App 不需要此 API。需要给其他客户端使用时，可安装 Python 3.12+ 和 FFmpeg：
 
 ~~~bash
 python -m venv .venv
@@ -100,55 +86,13 @@ python app.py
 
 默认监听 http://127.0.0.1:8080。远程客户端必须配置 HTTPS 地址。
 
-## 可选：非 Android 客户端下载任务 API
-
-推荐使用异步任务接口，而不是旧的同步下载接口：
-
-~~~bash
-# 1. 创建任务，返回 task.id
-curl -X POST http://127.0.0.1:8080/api/tasks \
-  -H 'Content-Type: application/json' \
-  -d '{"url":"https://example.com/public-video","quality":"1080"}'
-
-# 2. 查看最近任务
-curl 'http://127.0.0.1:8080/api/tasks?limit=20'
-
-# 3. 轮询任务（替换任务 ID）
-curl http://127.0.0.1:8080/api/tasks/TASK_ID
-
-# 4. 取消任务
-curl -X DELETE http://127.0.0.1:8080/api/tasks/TASK_ID
-
-# 5. 任务完成后获取文件
-curl -L http://127.0.0.1:8080/api/tasks/TASK_ID/file -o video.mp4
-~~~
-
-链接输入不必只有裸 URL，例如 `朋友分享了视频：https://example.com/video 复制打开` 也能识别。一次粘贴多个不同链接会提示你拆开处理，避免误下载。完整接口字段和状态定义见 [docs/API.md](docs/API.md)。
-
-## 测试和构建
-
-~~~bash
-make test
-make test-c
-make build-cpp
-~~~
-
-也可以直接运行：
+## 测试
 
 ~~~bash
 python -m unittest discover -s tests -v
-cmake -S native/c-client -B build/c-client
-cmake --build build/c-client --parallel
-ctest --test-dir build/c-client --output-on-failure
+make test-c
+make build-cpp
 ~~~
-
-Android Studio 打开 clients/android；其他客户端的运行方法见 [clients/README.md](clients/README.md)。
-
-## 部署时非常重要
-
-任务元数据和完成文件索引保存在 SQLite（默认 `/tmp/videodl/tasks.sqlite3`），但下载执行队列、工作线程和限流器仍属于**单个 Python 进程**。Docker/Gunicorn 因此固定为 **1 个 web worker + 8 个请求线程**；实际下载并发由独立的有界线程池控制。不要随手将 Gunicorn workers 改成 2 或更多，否则创建任务和查询任务可能落在不同进程，客户端就会遇到状态不同步或任务不存在。
-
-服务重启后，SQLite 中的历史任务仍可查询；已完成且文件位于持久卷中的任务可以继续获取文件。重启时正在执行的任务会被标记为“服务重启导致中断”，不会假装仍在运行，也不会自动续传。多实例/多 worker 方案仍需要共享队列/任务协调和共享文件存储。详见 [docs/SECURITY.md](docs/SECURITY.md)。
 
 ## License
 

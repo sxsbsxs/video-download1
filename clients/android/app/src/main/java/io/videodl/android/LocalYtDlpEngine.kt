@@ -27,41 +27,53 @@ data class VideoFormat(
     val videoFormatId: String,
     val audioFormatId: String?,
     val isAudio: Boolean,
+    val width: Int,
     val height: Int,
     val fps: Double,
+    val dynamicRange: String,
     val extension: String,
     val videoCodec: String,
     val audioCodec: String,
     val fileSize: Long,
+    val fileSizeIsApprox: Boolean,
     val bitrate: Double
 ) {
     val primaryLabel: String
         get() = if (isAudio) {
             if (bitrate > 0) "${bitrate.toInt()} kbps" else "音频"
+        } else if (width > 0 && height > 0) {
+            "${width} × ${height}"
         } else if (height > 0) {
             "${height}P"
         } else {
             "视频"
         }
 
-    val secondaryLabel: String
-        get() = buildList {
-            if (!isAudio && fps > 0) add("${fps.toInt()} FPS")
-            add(extension.uppercase())
-            if (isAudio && bitrate > 0) add("${bitrate.toInt()} kbps")
-        }.joinToString(" · ")
-
-    val detailLabel: String
+    val codecSummary: String
         get() = buildList {
             if (videoCodec.isNotBlank() && videoCodec != "none") add(videoCodec.shortCodec())
             if (audioCodec.isNotBlank() && audioCodec != "none") add(audioCodec.shortCodec())
-            if (!isAudio && audioFormatId != null) add("独立音视频流")
-            else if (!isAudio) add("含音频")
-        }.joinToString(" · ").ifBlank { "源站原始格式" }
+        }.distinct().joinToString(" + ")
+
+    val technicalSummary: String
+        get() = buildList {
+            if (!isAudio && fps > 0) add("${fpsLabelForFormat(fps)} FPS")
+            add(extension.uppercase())
+            if (dynamicRange.isNotBlank() && !dynamicRange.equals("SDR", true)) add(dynamicRange)
+            if (codecSummary.isNotBlank()) add(codecSummary)
+            add("ID $videoFormatId")
+        }.joinToString(" · ")
 
     val sizeLabel: String
-        get() = if (fileSize > 0) fileSize.readableSize() else "大小未知"
+        get() = if (fileSize > 0) {
+            (if (fileSizeIsApprox) "约 " else "") + fileSize.readableSize()
+        } else {
+            "大小未知"
+        }
 }
+
+private fun fpsLabelForFormat(value: Double): String =
+    String.format(java.util.Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')
 
 private fun String.shortCodec(): String = when {
     startsWith("avc", true) || startsWith("h264", true) -> "H.264"
@@ -72,7 +84,7 @@ private fun String.shortCodec(): String = when {
     startsWith("mp4a", true) || startsWith("aac", true) -> "AAC"
     startsWith("opus", true) -> "Opus"
     startsWith("vorbis", true) -> "Vorbis"
-    else -> take(12).uppercase()
+    else -> take(16).uppercase()
 }
 
 private fun Long.readableSize(): String = when {
@@ -178,12 +190,15 @@ object LocalYtDlpEngine {
                 videoFormatId = id,
                 audioFormatId = item.optString("audio_format_id").takeIf { it.isNotBlank() },
                 isAudio = audioOnly,
+                width = item.optInt("width"),
                 height = item.optInt("height"),
                 fps = item.optDouble("fps"),
+                dynamicRange = item.optString("dynamic_range"),
                 extension = item.optString("ext", "mp4"),
                 videoCodec = item.optString("vcodec"),
                 audioCodec = item.optString("acodec"),
                 fileSize = item.optLong("filesize"),
+                fileSizeIsApprox = item.optBoolean("filesize_is_approx"),
                 bitrate = item.optDouble("bitrate")
             )
         }
