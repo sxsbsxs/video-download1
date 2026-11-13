@@ -277,18 +277,18 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val item = SavedDownload(info.title, savedMedia.displayName, System.currentTimeMillis(), savedMedia.uri.toString())
+                history = listOf(item) + history.filterNot { it.contentUri == item.contentUri }.take(19)
+                storeHistory(this@MainActivity, history)
+
                 progress = 99.7f
                 statusText = "正在清理临时文件…"
                 renderState()
                 val completedDirectory = temporaryDirectory
                 withContext(Dispatchers.IO) {
-                    LocalYtDlpEngine.cleanup(completedDirectory)
+                    runCatching { LocalYtDlpEngine.cleanup(completedDirectory) }
                 }
                 temporaryDirectory = null
-
-                val item = SavedDownload(info.title, savedMedia.displayName, System.currentTimeMillis(), savedMedia.uri.toString())
-                history = listOf(item) + history.filterNot { it.contentUri == item.contentUri }.take(19)
-                storeHistory(this@MainActivity, history)
                 progress = 100f
                 statusText = "下载完成 · 已保存到 Downloads/VideoDL"
                 currentPage = 1
@@ -303,7 +303,7 @@ class MainActivity : ComponentActivity() {
                 val remainingDirectory = temporaryDirectory
                 if (remainingDirectory != null) {
                     withContext(Dispatchers.IO) {
-                        LocalYtDlpEngine.cleanup(remainingDirectory)
+                        runCatching { LocalYtDlpEngine.cleanup(remainingDirectory) }
                     }
                 }
                 downloading = false
