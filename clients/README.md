@@ -34,6 +34,23 @@ gradle -p clients/java run --args='http://127.0.0.1:8080 info https://example.co
 gradle -p clients/java run --args='http://127.0.0.1:8080 download https://example.com/video best output.mp4'
 ~~~
 
+## C 原生 SDK（C11）
+
+独立的 C 语言下载传输层，提供可复用静态库和 CLI；负责 API 请求、直接流式写盘、进度回调、取消和临时文件原子落盘。它不重复 Python 的 yt-dlp 站点提取器。
+
+~~~bash
+sudo apt-get install -y build-essential cmake pkg-config libcurl4-openssl-dev
+cmake -S native/c-client -B build/c-client -DCMAKE_BUILD_TYPE=Release
+cmake --build build/c-client --parallel
+ctest --test-dir build/c-client --output-on-failure
+./build/c-client/videodl-c --help
+./build/c-client/videodl-c health https://your-engine.example
+./build/c-client/videodl-c info https://your-engine.example https://example.com/video
+./build/c-client/videodl-c download https://your-engine.example https://example.com/video 1080 output.mp4
+~~~
+
+详情见 [native/c-client/README.md](../native/c-client/README.md)。
+
 ## C++
 
 依赖 C++17、CMake、libcurl 和 nlohmann-json：

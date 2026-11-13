@@ -56,6 +56,27 @@ jobs:
           gradle-version: "8.10"
       - run: gradle -p clients/java test build
 
+  c:
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install C dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake pkg-config libcurl4-openssl-dev clang
+      - name: Configure C11 SDK
+        run: cmake -S native/c-client -B build/c-client -DCMAKE_C_COMPILER=${{ matrix.compiler }} -DCMAKE_BUILD_TYPE=Debug
+      - name: Build C SDK and CLI
+        run: cmake --build build/c-client --parallel
+      - name: Run C unit tests
+        run: ctest --test-dir build/c-client --output-on-failure
+      - name: Verify CLI help
+        run: ./build/c-client/videodl-c --help
+
   cpp:
     runs-on: ubuntu-latest
     steps:

@@ -8,7 +8,7 @@ VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工�
 
 - **主应用：Android**，使用 Kotlin + Jetpack Compose。
 - **下载引擎：Python**，使用 yt-dlp 解析公开内容，并调用 FFmpeg 处理音视频。
-- **原生扩展：Rust / C++**，用于高性能任务核心和底层媒体能力。
+- **原生扩展：C / C++ / Rust**：C 提供流式传输 SDK，C++ 承担更高层的原生媒体集成，Rust 管理可复用任务规则。
 - **扩展客户端：Java / Swift / C#**，分别服务 JVM 工具、Apple 原生应用和桌面应用。
 
 仓库中的 Flask 仅作为应用调用的引擎 API，不提供 HTML 页面，不是网站产品。当前 Android 客户端通过配置的 API 地址连接引擎服务。
@@ -23,7 +23,7 @@ VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工�
 | 最佳画质、指定分辨率、音频下载 | API 已实现 |
 | 保存到 Android Downloads/VideoDL | 已接入 |
 | JVM Java 客户端 | 有基础命令行客户端 |
-| C++ 客户端 | 有基础命令行客户端 |
+| C++ 客户端 | 有基础命令行客户端 |\n| C 原生 SDK / CLI | 已实现流式下载、进度回调、取消、原子落盘与单元测试 |
 | Rust 任务核心 | 已有跨平台任务/进度模型和单元测试 |
 | Apple Swift 应用 | 已有 macOS SwiftUI 客户端源码 |
 | C# 桌面应用 | 已有 Avalonia 桌面客户端源码 |
@@ -37,7 +37,7 @@ VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工�
 | Kotlin | Android UI、协程、系统下载目录、通知与任务生命周期 | Android 主应用最合适 |
 | Python | yt-dlp 提取器、FFmpeg 调度、解析 API | yt-dlp 原生生态 |
 | Rust | 统一下载任务状态、进度数据模型、质量规则和安全文件名 | 内存安全、跨平台、适合核心逻辑 |
-| C++ | 原生媒体处理/系统集成接口与工具 | 适合 NDK、FFmpeg 和底层库 |
+| C | libcurl 网络传输、流式写盘、进度回调、取消和 C ABI | 轻量、稳定、便于被 NDK/C++/桌面程序调用 |\n| C++ | 更高层原生媒体处理、FFmpeg/NDK 集成 | 适合复杂原生媒体与平台适配 |
 | Java | JVM 自动化与兼容客户端 | 复用 JVM 生态；不是 Android 主 UI |
 | Swift | Apple 平台原生应用 | 原生 Apple UI 和系统文件能力 |
 | C# | Avalonia 桌面客户端 | Windows/Linux/macOS 桌面 UI |
