@@ -1,0 +1,31 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="VideoDL.Desktop.MainWindow"
+        Title="VideoDL"
+        Width="760" Height="620"
+        MinWidth="560" MinHeight="480">
+  <ScrollViewer>
+    <StackPanel Margin="28" Spacing="14">
+      <TextBlock Text="VideoDL" FontSize="32" FontWeight="Bold" />
+      <TextBlock Text="视频下载应用" Foreground="#667085" FontSize="14" />
+      <TextBlock Text="引擎 API 地址（远程服务必须使用 HTTPS）" />
+      <TextBox Name="ApiBaseBox" Text="https://your-engine.example" Watermark="https://your-engine.example" />
+      <TextBlock Text="公开视频链接" />
+      <TextBox Name="VideoUrlBox" Watermark="粘贴公开视频链接" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72" />
+      <TextBlock Text="画质（best / 1080 / 720 / audio）" />
+      <TextBox Name="QualityBox" Text="best" />
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <Button Content="解析视频" Click="Info_Click" />
+        <Button Content="下载文件" Click="Download_Click" />
+      </StackPanel>
+      <Border BorderBrush="#D0D5DD" BorderThickness="1" CornerRadius="8" Padding="14">
+        <StackPanel Spacing="8">
+          <TextBlock Name="TitleText" Text="尚未解析" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+          <TextBlock Name="UploaderText" Text="" Foreground="#667085" />
+          <TextBlock Name="FormatsText" Text="" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+      <TextBlock Name="StatusText" Text="就绪。" TextWrapping="Wrap" />
+    </StackPanel>
+  </ScrollViewer>
+</Window>
