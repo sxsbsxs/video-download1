@@ -76,6 +76,13 @@ def validate_public_url(raw: str) -> str:
     return raw.strip()
 
 
+def duration_filter(info, *, incomplete=False):
+    duration = info.get("duration")
+    if duration and duration > MAX_DURATION:
+        return f"视频超过时长限制（{MAX_DURATION // 60} 分钟）"
+    return None
+
+
 def ydl_options(**extra):
     base = {
         "quiet": True,
@@ -184,7 +191,7 @@ def download_video():
             merge_output_format=ext,
             postprocessors=postprocessors,
             max_filesize=MAX_FILE_MB * 1024 * 1024,
-            max_duration=MAX_DURATION,
+            match_filter=duration_filter,
             restrictfilenames=True,
         )
         with yt_dlp.YoutubeDL(opts) as ydl:
