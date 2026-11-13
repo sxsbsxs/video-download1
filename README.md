@@ -26,6 +26,7 @@ VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。�
 - 任务状态查询接口，包含已下载字节、总字节、速度、ETA 和百分比。
 - SQLite 保存任务元数据和完成文件索引；服务重启后可恢复历史状态，未完成任务会明确标记为中断。
 - Android 客户端从服务端读取真实任务进度；支持取消任务，并保留任务 ID 以便恢复轮询。
+- GET /api/tasks 支持读取最近任务列表，为 Android 下载历史页提供数据。
 - 完成后通过独立任务文件接口获取文件，写入 Downloads/VideoDL。
 - C11 SDK 支持流式写文件、进度回调、取消、TLS 校验、临时文件和成功后原子重命名。
 - C++ 客户端复用 C11 SDK。
@@ -96,13 +97,16 @@ curl -X POST http://127.0.0.1:8080/api/tasks \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://example.com/public-video","quality":"1080"}'
 
-# 2. 轮询任务（替换任务 ID）
+# 2. 查看最近任务
+curl 'http://127.0.0.1:8080/api/tasks?limit=20'
+
+# 3. 轮询任务（替换任务 ID）
 curl http://127.0.0.1:8080/api/tasks/TASK_ID
 
-# 3. 取消任务
+# 4. 取消任务
 curl -X DELETE http://127.0.0.1:8080/api/tasks/TASK_ID
 
-# 4. 任务完成后获取文件
+# 5. 任务完成后获取文件
 curl -L http://127.0.0.1:8080/api/tasks/TASK_ID/file -o video.mp4
 ~~~
 

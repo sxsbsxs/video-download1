@@ -167,6 +167,8 @@ class AsyncTaskApiTests(unittest.TestCase):
 
         history = self.client.get("/api/tasks?limit=10")
         self.assertEqual(history.status_code, 200)
+        self.assertEqual(self.client.get("/api/tasks?limit=10").status_code, 200)
+        self.assertEqual(self.client.get("/api/tasks?limit=10").status_code, 200)
         history_ids = [item["id"] for item in history.json["tasks"]]
         self.assertIn(task_id, history_ids)
 

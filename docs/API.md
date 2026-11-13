@@ -77,6 +77,12 @@ Successful response: HTTP 202 Accepted.
 }
 ~~~
 
+## List recent tasks
+
+`GET /api/tasks?limit=20`
+
+Returns recent tasks in reverse creation order. `limit` must be between 1 and 100. This endpoint is intended for the app's download-history view. Task metadata is read from SQLite, so records remain visible after a process restart, subject to the configured retention period.
+
 ## Query task state
 
 GET /api/tasks/{task_id}

@@ -49,8 +49,13 @@ def create_app(config: dict | None = None, engine=None, task_manager=None) -> Fl
             client_key = request.remote_addr or "unknown"
             is_task_poll = (
                 request.method == "GET"
-                and request.path.startswith("/api/tasks/")
-                and not request.path.endswith("/file")
+                and (
+                    request.path == "/api/tasks"
+                    or (
+                        request.path.startswith("/api/tasks/")
+                        and not request.path.endswith("/file")
+                    )
+                )
             )
             limiter_key = (
                 "videodl.status_rate_limiter"
