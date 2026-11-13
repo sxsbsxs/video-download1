@@ -63,12 +63,15 @@ private val httpClient = OkHttpClient.Builder()
 private fun VideoDLScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var apiBase by rememberSaveable { mutableStateOf("") }
-    var videoUrl by rememberSaveable { mutableStateOf("") }
-    var quality by rememberSaveable { mutableStateOf("best") }
-    var title by rememberSaveable { mutableStateOf("") }
-    var uploader by rememberSaveable { mutableStateOf("") }
-    var thumbnail by rememberSaveable { mutableStateOf<String?>(null) }
+    val prefs = remember(context) {
+        context.getSharedPreferences("videodl-client", android.content.Context.MODE_PRIVATE)
+    }
+    var apiBase by rememberSaveable { mutableStateOf(prefs.getString("apiBase", "") ?: "") }
+    var videoUrl by rememberSaveable { mutableStateOf(prefs.getString("videoUrl", "") ?: "") }
+    var quality by rememberSaveable { mutableStateOf(prefs.getString("quality", "best") ?: "best") }
+    var title by rememberSaveable { mutableStateOf(prefs.getString("title", "") ?: "") }
+    var uploader by rememberSaveable { mutableStateOf(prefs.getString("uploader", "") ?: "") }
+    var thumbnail by rememberSaveable { mutableStateOf(prefs.getString("thumbnail", null)) }
     var status by remember { mutableStateOf("填写服务端地址和公开视频链接后开始解析。") }
     var busy by remember { mutableStateOf(false) }
     var activeTaskId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -81,16 +84,25 @@ private fun VideoDLScreen() {
         Text("VideoDL", style = MaterialTheme.typography.headlineMedium)
         Text("多语言视频下载客户端", style = MaterialTheme.typography.bodyMedium)
         OutlinedTextField(
-            value = apiBase, onValueChange = { apiBase = it }, modifier = Modifier.fillMaxWidth(),
+            value = apiBase, onValueChange = {
+                apiBase = it
+                prefs.edit().putString("apiBase", it).apply()
+            }, modifier = Modifier.fillMaxWidth(),
             label = { Text("服务端 API 地址（HTTPS）") },
             placeholder = { Text("https://your-videodl-service.example") }, singleLine = true
         )
         OutlinedTextField(
-            value = videoUrl, onValueChange = { videoUrl = it }, modifier = Modifier.fillMaxWidth(),
+            value = videoUrl, onValueChange = {
+                videoUrl = it
+                prefs.edit().putString("videoUrl", it).apply()
+            }, modifier = Modifier.fillMaxWidth(),
             label = { Text("视频链接") }, placeholder = { Text("粘贴公开视频链接") }, minLines = 2
         )
         OutlinedTextField(
-            value = quality, onValueChange = { quality = it }, modifier = Modifier.fillMaxWidth(),
+            value = quality, onValueChange = {
+                quality = it
+                prefs.edit().putString("quality", it).apply()
+            }, modifier = Modifier.fillMaxWidth(),
             label = { Text("画质（best / 1080 / 720 / audio）") }, singleLine = true
         )
         Button(
@@ -107,6 +119,11 @@ private fun VideoDLScreen() {
                         title = info.optString("title", "未命名视频")
                         uploader = info.optString("uploader", "")
                         thumbnail = info.optString("thumbnail").takeIf { it.startsWith("http") }
+                        prefs.edit().apply {
+                            putString("title", title)
+                            putString("uploader", uploader)
+                            putString("thumbnail", thumbnail)
+                        }.apply()
                         status = "解析完成。"
                     } catch (error: Exception) {
                         status = error.message ?: "解析失败，请检查服务端地址和链接。"
@@ -145,9 +162,16 @@ private fun VideoDLScreen() {
                                 apiBase = apiBase,
                                 videoUrl = videoUrl,
                                 quality = quality,
-                                onTaskCreated = { activeTaskId = it },
+                                onTaskCreated = {
+                                    activeTaskId = it
+                                    prefs.edit().putString("activeTaskId", it).apply()
+                                },
                                 onStatus = { status = it },
-                                onProgress = { progressPercent = it }
+                                onProgress = { progressPercent = it },
+                                onTaskTerminal = {
+                                    activeTaskId = null
+                                    prefs.edit().remove("activeTaskId").apply()
+                                }
                             ) { taskId ->
                                 withContext(Dispatchers.IO) {
                                     downloadTaskToDownloads(context.contentResolver, apiBase, taskId, quality)
@@ -155,6 +179,7 @@ private fun VideoDLScreen() {
                             }
                             status = "下载完成：" + saved
                             activeTaskId = null
+                            prefs.edit().remove("activeTaskId").apply()
                             progressPercent = null
                         } catch (error: Exception) {
                             status = error.message ?: "下载失败。"
@@ -178,7 +203,11 @@ private fun VideoDLScreen() {
                                     apiBase = apiBase,
                                     taskId = taskId,
                                     onStatus = { status = it },
-                                    onProgress = { progressPercent = it }
+                                    onProgress = { progressPercent = it },
+                                    onTaskTerminal = {
+                                        activeTaskId = null
+                                        prefs.edit().remove("activeTaskId").apply()
+                                    }
                                 ) { id ->
                                     withContext(Dispatchers.IO) {
                                         downloadTaskToDownloads(context.contentResolver, apiBase, id, quality)
@@ -186,6 +215,7 @@ private fun VideoDLScreen() {
                                 }
                                 status = "下载完成：" + saved
                                 activeTaskId = null
+                                prefs.edit().remove("activeTaskId").apply()
                                 progressPercent = null
                             } catch (error: Exception) {
                                 status = error.message ?: "恢复任务同步失败。"
@@ -267,6 +297,7 @@ private suspend fun downloadWithTaskSync(
     onTaskCreated: (String) -> Unit,
     onStatus: (String) -> Unit,
     onProgress: (Float?) -> Unit,
+    onTaskTerminal: () -> Unit,
     fetchCompletedFile: suspend (taskId: String) -> String
 ): String {
     val created = withContext(Dispatchers.IO) {
@@ -278,7 +309,7 @@ private suspend fun downloadWithTaskSync(
     }
     val taskId = created.getJSONObject("task").getString("id")
     onTaskCreated(taskId)
-    return waitForDownloadTask(apiBase, taskId, onStatus, onProgress, fetchCompletedFile)
+    return waitForDownloadTask(apiBase, taskId, onStatus, onProgress, onTaskTerminal, fetchCompletedFile)
 }
 
 private suspend fun waitForDownloadTask(
@@ -286,6 +317,7 @@ private suspend fun waitForDownloadTask(
     taskId: String,
     onStatus: (String) -> Unit,
     onProgress: (Float?) -> Unit,
+    onTaskTerminal: () -> Unit,
     fetchCompletedFile: suspend (taskId: String) -> String
 ): String {
     while (true) {
@@ -325,8 +357,14 @@ private suspend fun waitForDownloadTask(
                 onStatus("下载完成，正在保存到系统 Downloads/VideoDL…")
                 return fetchCompletedFile(taskId)
             }
-            "failed" -> throw IOException(task.optString("error", "下载失败。"))
-            "cancelled" -> throw IOException("下载任务已取消。")
+            "failed" -> {
+                onTaskTerminal()
+                throw IOException(task.optString("error", "下载失败。"))
+            }
+            "cancelled" -> {
+                onTaskTerminal()
+                throw IOException("下载任务已取消。")
+            }
             else -> onStatus("正在同步任务状态…")
         }
         delay(800L)
