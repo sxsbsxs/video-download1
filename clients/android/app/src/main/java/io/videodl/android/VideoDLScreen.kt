@@ -741,15 +741,7 @@ private fun QuickEntry(
                 color = SnapYellowSoft
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    androidx.compose.runtime.CompositionLocalProvider(
-                        androidx.compose.material3.LocalContentColor provides PrimaryText
-                    ) {
-                        androidx.compose.material3.ProvideTextStyle(
-                            MaterialTheme.typography.labelLarge
-                        ) {
-                            icon()
-                        }
-                    }
+                    icon()
                 }
             }
             Spacer(Modifier.height(8.dp))
