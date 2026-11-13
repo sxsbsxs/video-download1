@@ -28,6 +28,7 @@ class DownloadTask:
     id: str
     url: str
     quality: str
+    owner_id: str = ""
     state: str = "queued"
     downloaded_bytes: int = 0
     total_bytes: int | None = None
@@ -81,6 +82,7 @@ class DownloadTaskManager:
             "id": task.id,
             "url": task.url,
             "quality": task.quality,
+            "owner_id": task.owner_id,
             "state": task.state,
             "downloaded_bytes": task.downloaded_bytes,
             "total_bytes": task.total_bytes,
@@ -106,6 +108,7 @@ class DownloadTaskManager:
                     id=row["id"],
                     url=row["url"],
                     quality=row["quality"],
+                    owner_id=row["owner_id"] if "owner_id" in row.keys() else "",
                     state=row["state"],
                     downloaded_bytes=int(row["downloaded_bytes"] or 0),
                     total_bytes=row["total_bytes"],
@@ -146,12 +149,14 @@ class DownloadTaskManager:
 
         self.prune_expired()
 
-    def submit(self, url: str, quality: str) -> dict:
+    def submit(self, url: str, quality: str, owner_id: str = "") -> dict:
         self.prune_expired()
         if not self._capacity.acquire(blocking=False):
             raise TaskQueueFull("下载队列已满，请稍后再试。")
 
-        task = DownloadTask(id=uuid.uuid4().hex, url=url, quality=quality)
+        task = DownloadTask(
+            id=uuid.uuid4().hex, url=url, quality=quality, owner_id=owner_id
+        )
         try:
             with self._lock:
                 self._tasks[task.id] = task
@@ -275,12 +280,12 @@ class DownloadTaskManager:
                 if task.state not in TERMINAL_STATES
             ]
 
-    def list_recent(self, limit: int = 20) -> list[dict]:
+    def list_recent(self, limit: int = 20, owner_id: str = "") -> list[dict]:
         self.prune_expired()
         bounded_limit = max(1, min(int(limit), 100))
         with self._lock:
             recent = sorted(
-                self._tasks.values(),
+                (task for task in self._tasks.values() if task.owner_id == owner_id),
                 key=lambda task: task.created_at,
                 reverse=True,
             )[:bounded_limit]

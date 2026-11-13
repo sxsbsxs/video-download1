@@ -54,8 +54,23 @@ class TaskStore:
                     created_at REAL NOT NULL,
                     updated_at REAL NOT NULL,
                     work_dir TEXT,
-                    file_path TEXT
+                    file_path TEXT,
+                    owner_id TEXT NOT NULL DEFAULT ''
                 )
+                """
+            )
+            columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(download_tasks)")
+            }
+            if "owner_id" not in columns:
+                connection.execute(
+                    "ALTER TABLE download_tasks ADD COLUMN owner_id TEXT NOT NULL DEFAULT ''"
+                )
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_download_tasks_owner_updated
+                ON download_tasks(owner_id, updated_at)
                 """
             )
             connection.execute(
@@ -72,7 +87,7 @@ class TaskStore:
             task["speed_bytes_per_second"], task["eta_seconds"],
             task["filename"], task["size_bytes"], task["error"],
             task["created_at"], task["updated_at"],
-            task["work_dir"], task["file_path"],
+            task["work_dir"], task["file_path"], task.get("owner_id", ""),
         )
         with self._connection() as connection:
             connection.execute(
@@ -80,8 +95,8 @@ class TaskStore:
                 INSERT INTO download_tasks (
                     id, url, quality, state, downloaded_bytes, total_bytes,
                     speed_bytes_per_second, eta_seconds, filename, size_bytes,
-                    error, created_at, updated_at, work_dir, file_path
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    error, created_at, updated_at, work_dir, file_path, owner_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                     url=excluded.url,
                     quality=excluded.quality,
@@ -95,7 +110,8 @@ class TaskStore:
                     error=excluded.error,
                     updated_at=excluded.updated_at,
                     work_dir=excluded.work_dir,
-                    file_path=excluded.file_path
+                    file_path=excluded.file_path,
+                    owner_id=excluded.owner_id
                 """,
                 values,
             )
