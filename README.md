@@ -8,7 +8,8 @@ VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工�
 
 - **主应用：Android**，使用 Kotlin + Jetpack Compose。
 - **下载引擎：Python**，使用 yt-dlp 解析公开内容，并调用 FFmpeg 处理音视频。
-- **原生扩展：C / C++ / Rust**：C 提供流式传输 SDK，C++ 承担更高层的原生媒体集成，Rust 管理可复用任务规则。
+- **原生下载层：C**，提供 C11 SDK、libcurl 网络传输、流式写盘、进度回调、取消和安全文件落盘。
+- **原生扩展：C++ / Rust**，C++ 复用 C SDK 处理更高层客户端逻辑；Rust 管理可复用任务规则与状态模型。
 - **扩展客户端：Java / Swift / C#**，分别服务 JVM 工具、Apple 原生应用和桌面应用。
 
 仓库中的 Flask 仅作为应用调用的引擎 API，不提供 HTML 页面，不是网站产品。当前 Android 客户端通过配置的 API 地址连接引擎服务。
@@ -22,12 +23,13 @@ VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工�
 | 封面、标题、上传者和画质列表 | API 与 Android 界面已接入 |
 | 最佳画质、指定分辨率、音频下载 | API 已实现 |
 | 保存到 Android Downloads/VideoDL | 已接入 |
-| JVM Java 客户端 | 有基础命令行客户端 |
-| C++ 客户端 | 有基础命令行客户端 |\n| C 原生 SDK / CLI | 已实现流式下载、进度回调、取消、原子落盘与单元测试 |
+| C11 SDK / CLI | 已实现流式下载、进度回调、取消、临时文件原子落盘和单元测试 |
+| C++ 客户端 | 已复用 C SDK 作为底层传输层 |
 | Rust 任务核心 | 已有跨平台任务/进度模型和单元测试 |
-| Apple Swift 应用 | 已有 macOS SwiftUI 客户端源码 |
-| C# 桌面应用 | 已有 Avalonia 桌面客户端源码 |
-| 后台持续下载、真实进度、断点续传 | 尚未完成 |
+| JVM Java 客户端 | 有基础命令行客户端 |
+| Apple Swift 应用 | 有 macOS SwiftUI 客户端源码 |
+| C# 桌面应用 | 有 Avalonia 桌面客户端源码 |
+| 后台持续下载、服务端任务队列、断点续传 | 尚未完成 |
 | 本地离线 yt-dlp 引擎 | 尚未完成；目前 Android 依赖 API 服务 |
 
 ## 语言分工
@@ -36,8 +38,9 @@ VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工�
 |---|---|---|
 | Kotlin | Android UI、协程、系统下载目录、通知与任务生命周期 | Android 主应用最合适 |
 | Python | yt-dlp 提取器、FFmpeg 调度、解析 API | yt-dlp 原生生态 |
-| Rust | 统一下载任务状态、进度数据模型、质量规则和安全文件名 | 内存安全、跨平台、适合核心逻辑 |
-| C | libcurl 网络传输、流式写盘、进度回调、取消和 C ABI | 轻量、稳定、便于被 NDK/C++/桌面程序调用 |\n| C++ | 更高层原生媒体处理、FFmpeg/NDK 集成 | 适合复杂原生媒体与平台适配 |
+| C | libcurl 网络传输、流式写盘、进度回调、取消和 C ABI | 轻量、稳定，便于 NDK/C++/桌面程序复用 |
+| C++ | 更高层原生客户端逻辑、后续 NDK/FFmpeg 媒体集成 | 适合复杂原生媒体与平台适配 |
+| Rust | 统一下载任务状态、进度数据模型、质量规则和安全文件名 | 内存安全、跨平台，适合核心逻辑 |
 | Java | JVM 自动化与兼容客户端 | 复用 JVM 生态；不是 Android 主 UI |
 | Swift | Apple 平台原生应用 | 原生 Apple UI 和系统文件能力 |
 | C# | Avalonia 桌面客户端 | Windows/Linux/macOS 桌面 UI |
@@ -56,12 +59,11 @@ VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工�
 │   ├── apple/                     # SwiftUI macOS 应用
 │   ├── desktop/                   # C# + Avalonia
 │   ├── java/                      # Java JVM 客户端
-│   ├── cpp/                       # C++ 客户端/原生集成入口
-│   └── rust/                      # Rust 客户端
+│   ├── cpp/                       # C++ 客户端，复用 C SDK
+│   └── rust/                      # Rust 命令行客户端
 ├── native/
-│   └── rust-core/                 # 可复用的任务状态与质量规则核心
-├── native/
-│   └── rust-core/                 # Rust 任务核心
+│   ├── c-client/                  # C11 SDK、CLI、测试
+│   └── rust-core/                 # Rust 任务状态与质量规则核心
 ├── docs/
 │   └── ARCHITECTURE.md
 └── tests/
@@ -94,9 +96,22 @@ python app.py
 
 ## Android 应用
 
-使用 Android Studio 打开 `clients/android`，运行 app 模块。应用中填写引擎 API 地址和公开视频链接，解析后选择画质并保存到系统 Downloads/VideoDL。
+使用 Android Studio 打开 clients/android，运行 app 模块。应用中填写引擎 API 地址和公开视频链接，解析后选择画质并保存到系统 Downloads/VideoDL。
 
 远程引擎必须使用 HTTPS。当前 Android 客户端是应用界面，yt-dlp 仍在 API 服务运行，并非完全离线版本。
+
+## C 原生 SDK 与命令行工具
+
+需要 C11、CMake 和 libcurl：
+
+~~~bash
+sudo apt-get install -y build-essential cmake pkg-config libcurl4-openssl-dev
+cmake -S native/c-client -B build/c-client -DCMAKE_BUILD_TYPE=Release
+cmake --build build/c-client --parallel
+ctest --test-dir build/c-client --output-on-failure
+~~~
+
+详细 API、进度回调、取消和安全文件落盘说明见 native/c-client/README.md。
 
 ## Apple 应用（SwiftUI）
 
@@ -117,7 +132,7 @@ dotnet run --project clients/desktop/VideoDL.Desktop.csproj
 
 ## Java / C++ / Rust 工具
 
-用法与依赖见 [clients/README.md](clients/README.md)。
+用法与依赖见 clients/README.md。
 
 ## 引擎容器
 
