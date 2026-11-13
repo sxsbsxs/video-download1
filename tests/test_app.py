@@ -52,7 +52,15 @@ class ApiTests(unittest.TestCase):
         with patch(
             "videodl.api.validate_public_url",
             side_effect=lambda value: value,
-        ) as validator:
+        ) as validator, patch.object(
+            app.extensions["videodl.engine"],
+            "extract_info",
+            return_value={
+                "id": "test-video",
+                "title": "Example",
+                "formats": [],
+            },
+        ):
             response = self.client.post("/api/info", json={"url": share_text})
         self.assertEqual(response.status_code, 200)
         validator.assert_called_once_with("https://example.com/watch?id=42")
@@ -146,7 +154,7 @@ class AsyncTaskApiTests(unittest.TestCase):
             {
                 "TESTING": True,
                 "DOWNLOAD_DIR": Path(self.temp_dir.name),
-                "RATE_LIMIT_PER_MINUTE": 2,
+                "RATE_LIMIT_PER_MINUTE": 100,
                 "TASK_STATUS_RATE_LIMIT_PER_MINUTE": 100,
                 "MAX_CONCURRENT_DOWNLOADS": 1,
                 "TASK_QUEUE_SIZE": 2,

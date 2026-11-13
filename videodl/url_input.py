@@ -30,6 +30,15 @@ _LEADING_WRAPPERS = "<([{（【《「『\"'"
 def _clean_candidate(candidate: str) -> str:
     value = candidate.strip()
     value = value.lstrip(_LEADING_WRAPPERS)
+
+    # Strip Chinese sentence punctuation even when the share app placed it
+    # immediately after the URL without a separating space.
+    for separator in ("，", "。", "！", "？", "；", "、"):
+        position = value.find(separator)
+        if position >= 0:
+            value = value[:position]
+            break
+
     value = value.rstrip(_TRAILING_PUNCTUATION)
 
     for suffix in (
