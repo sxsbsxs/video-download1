@@ -32,6 +32,16 @@ class ApiTests(unittest.TestCase):
         response = self.client.post("/api/info", json={"url": "file:///etc/passwd"})
         self.assertEqual(response.status_code, 400)
 
+    def test_numeric_quality_passes_validation(self):
+        from unittest.mock import patch
+        with patch("app.validate_public_url", return_value="https://example.com/video"), \
+             patch("app.download_slots.acquire", return_value=False):
+            response = self.client.post(
+                "/api/download",
+                json={"url": "https://example.com/video", "quality": "1080"},
+            )
+        self.assertEqual(response.status_code, 429)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -168,7 +168,7 @@ def download_video():
         return jsonify(error=str(exc)), 400
 
     quality = str(data.get("quality", "best"))
-    if quality not in {"best", "audio"} and not re.fullmatch(r"\\d{2,4}", quality):
+    if quality not in {"best", "audio"} and not re.fullmatch(r"\d{2,4}", quality):
         return jsonify(error="画质选项无效。"), 400
 
     if not download_slots.acquire(blocking=False):
