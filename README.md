@@ -79,7 +79,15 @@ VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。A
 └── Dockerfile                      # Python 引擎容器
 ~~~
 
-## 快速启动 Python 引擎
+## Android 本地运行
+
+Android APK 内置 Chaquopy、Python 3.13 和 yt-dlp；解析与下载直接在手机上进行，完成后保存至 `Downloads/VideoDL`。不需要创建服务器、不需要配置 API 地址。手机只需能访问对应的视频来源网站。
+
+画质菜单不是写死的四档，而是显示来源站点实际返回的格式；可按视频或音频类型选择，并展示分辨率、帧率、编码、容器和估算体积。来源若提供分离的视频/音频流，应用会在手机上下载并通过 FFmpegKit 合并。
+
+Android 构建说明见 [docs/ANDROID.md](docs/ANDROID.md)，第三方组件许可见 [clients/android/THIRD_PARTY_NOTICES.md](clients/android/THIRD_PARTY_NOTICES.md)。
+
+## 可选：启动 Python API 服务（Android 不需要）
 
 需要 Python 3.12+ 和 FFmpeg：
 
@@ -92,7 +100,7 @@ python app.py
 
 默认监听 http://127.0.0.1:8080。远程客户端必须配置 HTTPS 地址。
 
-## 下载任务 API
+## 可选：非 Android 客户端下载任务 API
 
 推荐使用异步任务接口，而不是旧的同步下载接口：
 

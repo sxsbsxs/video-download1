@@ -2,11 +2,46 @@
 
 ## 产品边界
 
-VideoDL 是 Android 优先的多平台应用，不开发网站。Python Flask 只提供 JSON / 文件流 API，yt-dlp 负责站点提取，FFmpeg 负责媒体后处理。
+VideoDL 以 Android 原生下载应用为主。**Android 客户端直接在手机本地运行 yt-dlp，不依赖 Flask API、远程任务服务或用户填写的服务器地址。** Flask 服务端仍保留为可选组件，供其他语言客户端或自建集成使用。
 
-## 后端分层
+## Android 本地数据流
 
-~~~text
+```text
+Android UI (Kotlin + Compose)
+       |
+       v
+LocalYtDlpEngine.kt
+       |
+       +--> Chaquopy / CPython 3.13
+       |        |
+       |        v
+       |     yt-dlp
+       |        |
+       |        +--> source metadata + actual formats
+       |        |
+       |        +--> local stream downloads
+       |
+       +--> FFmpegKit (merge separate audio/video streams)
+       |
+       v
+MediaStore / Downloads/VideoDL
+```
+
+Android:
+- Parses share text and extracts one source URL locally.
+- Calls yt-dlp directly in an embedded Python runtime.
+- Lists all video and audio formats returned by the source, instead of a fixed four-choice quality menu.
+- Downloads source streams into app cache and merges separate streams on-device.
+- Saves the completed artifact into Android's Downloads collection.
+- Stores a small local recent-download list in app preferences.
+
+The Android app does not use `/api/info`, `/api/tasks`, or the remote task owner token.
+
+## Optional server components
+
+The Flask backend remains available for non-Android clients and automation:
+
+```text
 HTTP clients
     |
     v
@@ -29,46 +64,17 @@ videodl/api.py
                  |
                  v
         per-task temporary folder
-~~~
+```
 
-### Module responsibilities
+The task store, queue, rate limiter and API contracts describe this optional server path; they are not part of the Android standalone download flow.
 
-- app_factory.py: creates Flask app and wires dependencies.
-- api.py: HTTP route contracts and HTTP status mapping.
-- config.py: validated environment configuration.
-- security.py: HTTP(S), credentials, hostname, DNS and public-IP checks.
-- quality.py: normalizes best/audio/resolution choices and builds yt-dlp selectors.
-- engine.py: wraps yt-dlp and finds/validates the final output.
-- tasks.py: bounded work queue, state transitions, progress snapshots, cancellation and recovery.
-- task_store.py: SQLite repository for durable task metadata and completed artifact references.
-- rate_limit.py: process-local sliding-window request limiter.
-- errors.py: domain errors and user-safe error strings.
+## Other client layers
 
-## Task lifecycle
-
-~~~text
-queued -> resolving -> downloading -> processing -> completed
-   |          |             |              |
-   +----------+-------------+--------------+--> failed
-   +----------+-------------+--------------+--> cancelling -> cancelled
-~~~
-
-The worker reports actual yt-dlp progress events. The Android app polls GET /api/tasks/{id}, displays the state/bytes/speed/percent, can issue DELETE to cancel, and fetches /file only after completion.
-
-## Client layers
-
-- Kotlin: Compose UI and Android MediaStore integration; task state is fetched from API.
 - C11: stable C ABI over libcurl, bounded JSON response, streaming transfer, progress callback and temp-file rename.
 - C++: higher-level client which reuses the C SDK.
 - Rust: platform-independent state/progress/quality/filename primitives.
-- Java, Swift and C#: additional platform clients, with their current feature limits documented in clients/README.md.
-
-## Process model (critical)
-
-Task metadata is rehydrated from SQLite at process start. Queue capacity, active worker threads and rate limiting remain process-local. The Docker image therefore starts Gunicorn with one web worker and multiple request threads. The task executor runs downloads concurrently in its own bounded worker pool.
-
-This is intentionally a single-instance MVP. A process restart keeps task history in SQLite; tasks that were queued or running are marked failed with an interruption reason, while completed artifacts remain downloadable when the database and file volume persist. Multiple web workers or replicas still cannot coordinate the live executor and state updates. Before scaling out, add a shared queue/worker service and shared task coordination, and move outputs to shared object storage.
+- Java, Swift and C#: additional platform clients with feature limits documented in `clients/README.md`.
 
 ## Security boundary
 
-The server rejects non-HTTP(S), credential-bearing and initially private/local URLs. This first DNS check is not a complete SSRF sandbox because extractors may follow redirects or resolve later URLs independently. Production deployment must enforce outbound network restrictions at the container/host level. See SECURITY.md.
+yt-dlp only downloads media exposed by the source website to the local app. VideoDL does not implement DRM circumvention, paywall bypass or access-control bypass. The optional server has a separate SSRF threat model: it validates public HTTP(S) URLs, but production deployment must also enforce outbound network restrictions at the container/host level. See SECURITY.md.

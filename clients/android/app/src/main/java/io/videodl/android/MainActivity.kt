@@ -194,12 +194,16 @@ private fun VideoDLApp(initialText: String) {
                     )
                 }
                 Surface(
-                    shape = CircleShape,
+                    shape = RoundedCornerShape(50),
                     color = VideoDLColors.surface,
-                    modifier = Modifier.size(42.dp)
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.History, contentDescription = "下载历史", tint = VideoDLColors.ink)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(shape = CircleShape, color = Color(0xFF7CA52B), modifier = Modifier.size(7.dp)) {}
+                        Spacer(Modifier.width(7.dp))
+                        Text("本机引擎", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -244,6 +248,8 @@ private fun VideoDLApp(initialText: String) {
                                     ?.getItemAt(0)?.coerceToText(context)?.toString()
                                 if (!copied.isNullOrBlank()) {
                                     input = copied
+                                    mediaInfo = null
+                                    selectedFormatKey = ""
                                     errorText = ""
                                 }
                             }
@@ -257,6 +263,8 @@ private fun VideoDLApp(initialText: String) {
                         value = input,
                         onValueChange = {
                             input = it
+                            mediaInfo = null
+                            selectedFormatKey = ""
                             errorText = ""
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -687,7 +695,8 @@ private fun FormatOptionRow(
 private fun saveIntoDownloads(context: Context, source: File, title: String): String {
     val extension = source.extension.ifBlank { "mp4" }
     val safeTitle = title
-        .replace(Regex("[\\\\/:*?\\\"<>|\\\\p{Cntrl}]"), "_")
+        .filterNot { it.isISOControl() }
+        .replace(Regex("""[\\/:*?"<>|]"""), "_")
         .trim()
         .take(90)
         .ifBlank { "VideoDL" }

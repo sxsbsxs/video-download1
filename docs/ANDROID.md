@@ -1,33 +1,32 @@
-# Android client
+# Android standalone application
 
-## Current behavior
+The Android app runs its downloader on the phone. It does **not** ask the user for a VideoDL server address and does not call the Flask API.
 
-The Android application is a Kotlin + Jetpack Compose client. It:
+## Local engine
 
-1. Connects to the configured HTTPS VideoDL Engine API. The app can also receive plain-text share intents and directly opened http(s) links from other apps.
-2. Sends the entered link or entire share text to POST /api/info; the server extracts the actual URL and returns it as source_url. The app then replaces the mixed share text with the clean URL.
-3. Displays title, uploader and thumbnail.
-4. Creates a server task with POST /api/tasks.
-5. Polls GET /api/tasks/{id} and renders the server-reported state and transfer progress.
-6. Sends DELETE /api/tasks/{id} when the user requests cancellation.
-7. Fetches the completed artifact and writes it to Downloads/VideoDL through MediaStore.
-8. Reads GET /api/tasks?limit=20 to display recent downloads, reconnects to unfinished tasks, and can save a completed server-side task again.
+- Kotlin + Jetpack Compose provides the interface and writes completed files to `Downloads/VideoDL`.
+- Chaquopy embeds CPython 3.13 in the APK.
+- yt-dlp 2026.10.26 extracts video metadata and the actual format list from the source website.
+- The UI presents the formats returned by the source: resolution, frame rate, container, codecs and estimated size. Audio-only formats are listed separately.
+- When the chosen video and audio streams are separate, FFmpegKit merges them locally on the device.
+- The app accepts plain URLs, text containing one URL, Android share intents and opened HTTP(S) links.
 
-The task identifier and main form values use Compose saveable state. The client also stores a random owner token in private app preferences; the same token is sent with task creation, status polling, cancellation, retry, history and file retrieval. When the activity is recreated and a task ID remains, the user can choose 恢复同步下载任务 to reconnect to the server-side task.
+The Android app needs ordinary internet access to reach the source website. This is **not** a connection to a VideoDL server. No server deployment, API URL, account or remote queue is required.
 
 ## Build
 
-Open clients/android in Android Studio, or run:
+Open `clients/android` in Android Studio or run:
 
-~~~bash
+```bash
+python3.13 --version
 gradle -p clients/android assembleDebug
-~~~
+```
 
-CI uploads a debug APK artifact from the application build workflow.
+The Android build uses Chaquopy 17.2.0 and Python 3.13. The GitHub Actions Android job installs Python 3.13 before invoking Gradle.
 
-## Known limitations
+## Current limitations
 
-- Task metadata is stored in SQLite. In-flight tasks are marked failed after a server restart rather than automatically resumed.
-- Background work is not yet managed by Android WorkManager. The UI coroutine may stop when the app process is killed.
-- Task polling is periodic HTTP polling, not a WebSocket stream. The task-history view shows server-side tasks and does not yet provide local Room history.
-- Output naming currently uses a generated VideoDL filename rather than the source's original title.
+- yt-dlp support depends on each source website and its current anti-bot behavior. Some sites may require cookies, browser-session data, a JavaScript runtime or browser TLS impersonation which is not bundled.
+- High-resolution formats may be separate video and audio streams; the app downloads both and merges them locally with FFmpegKit.
+- Downloads currently run while the application process is alive. WorkManager-based long-running tasks, automatic resume after process death, cookie import and DRM/paid-content bypass are not included.
+- The source site may not provide every resolution or audio format. VideoDL can only display formats which the source actually exposes to yt-dlp.
