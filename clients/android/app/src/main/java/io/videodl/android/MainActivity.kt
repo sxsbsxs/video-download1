@@ -381,6 +381,7 @@ private fun VideoDLScreen() {
                                             val saved = waitForDownloadTask(
                                                 apiBase,
                                                 newTaskId,
+                                                ownerToken,
                                                 { status = it },
                                                 { progressPercent = it },
                                                 {
@@ -439,7 +440,8 @@ private fun VideoDLScreen() {
                                                         context.contentResolver,
                                                         apiBase,
                                                         completedId,
-                                                        taskQuality
+                                                        taskQuality,
+                                                        ownerToken
                                                     )
                                                 }
                                             }
