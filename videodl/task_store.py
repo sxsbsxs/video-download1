@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 
 class TaskStore:
-    """Small SQLite repository for task metadata and completion records.
-
-    Each operation owns its SQLite connection. This keeps the store safe to use
-    from Flask request threads and the bounded download worker threads without
-    sharing sqlite connection objects across threads.
-    """
+    """SQLite repository for task metadata and completed-file references."""
 
     def __init__(self, database_path: Path):
         self.database_path = Path(database_path)
@@ -28,8 +24,17 @@ class TaskStore:
         connection.execute("PRAGMA busy_timeout = 10000")
         return connection
 
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        connection = self._connect()
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
+
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.execute("PRAGMA synchronous = NORMAL")
             connection.execute(
@@ -61,25 +66,15 @@ class TaskStore:
             )
 
     def save(self, task: dict[str, Any]) -> None:
-        """Insert or update one task snapshot in a single transaction."""
         values = (
-            task["id"],
-            task["url"],
-            task["quality"],
-            task["state"],
-            task["downloaded_bytes"],
-            task["total_bytes"],
-            task["speed_bytes_per_second"],
-            task["eta_seconds"],
-            task["filename"],
-            task["size_bytes"],
-            task["error"],
-            task["created_at"],
-            task["updated_at"],
-            task["work_dir"],
-            task["file_path"],
+            task["id"], task["url"], task["quality"], task["state"],
+            task["downloaded_bytes"], task["total_bytes"],
+            task["speed_bytes_per_second"], task["eta_seconds"],
+            task["filename"], task["size_bytes"], task["error"],
+            task["created_at"], task["updated_at"],
+            task["work_dir"], task["file_path"],
         )
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 INSERT INTO download_tasks (
@@ -106,7 +101,7 @@ class TaskStore:
             )
 
     def load_all(self) -> list[dict[str, Any]]:
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 "SELECT * FROM download_tasks ORDER BY created_at"
             ).fetchall()
@@ -116,14 +111,14 @@ class TaskStore:
         ids = list(task_ids)
         if not ids:
             return
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.executemany(
                 "DELETE FROM download_tasks WHERE id = ?",
                 ((task_id,) for task_id in ids),
             )
 
     def count(self) -> int:
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 "SELECT COUNT(*) AS total FROM download_tasks"
             ).fetchone()
