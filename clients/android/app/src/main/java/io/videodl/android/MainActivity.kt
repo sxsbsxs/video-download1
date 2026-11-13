@@ -187,7 +187,7 @@ private fun VideoDLScreen() {
                                 }
                             ) { taskId ->
                                 withContext(Dispatchers.IO) {
-                                    downloadTaskToDownloads(context.contentResolver, apiBase, taskId, quality)
+                                    downloadTaskToDownloads(context.contentResolver, apiBase, taskId, quality, ownerToken)
                                 }
                             }
                             status = "下载完成：" + saved
@@ -215,6 +215,7 @@ private fun VideoDLScreen() {
                                 val saved = waitForDownloadTask(
                                     apiBase = apiBase,
                                     taskId = taskId,
+                                    ownerToken = ownerToken,
                                     onStatus = { status = it },
                                     onProgress = { progressPercent = it },
                                     onTaskTerminal = {
@@ -223,7 +224,7 @@ private fun VideoDLScreen() {
                                     }
                                 ) { id ->
                                     withContext(Dispatchers.IO) {
-                                        downloadTaskToDownloads(context.contentResolver, apiBase, id, quality)
+                                        downloadTaskToDownloads(context.contentResolver, apiBase, id, quality, ownerToken)
                                     }
                                 }
                                 status = "下载完成：" + saved
@@ -248,7 +249,7 @@ private fun VideoDLScreen() {
                             try {
                                 val taskId = activeTaskId ?: return@launch
                                 withContext(Dispatchers.IO) {
-                                    deleteJson(apiBase, "/api/tasks/" + taskId)
+                                    deleteJson(apiBase, "/api/tasks/" + taskId, ownerToken)
                                 }
                                 status = "已发送取消请求，正在等待引擎确认…"
                             } catch (error: Exception) {
@@ -339,7 +340,8 @@ private fun VideoDLScreen() {
                                                     context.contentResolver,
                                                     apiBase,
                                                     taskId,
-                                                    taskQuality
+                                                    taskQuality,
+                                                    ownerToken
                                                 )
                                             }
                                             status = "已保存：" + saved
@@ -391,7 +393,8 @@ private fun VideoDLScreen() {
                                                         context.contentResolver,
                                                         apiBase,
                                                         completedId,
-                                                        taskQuality
+                                                        taskQuality,
+                                                        ownerToken
                                                     )
                                                 }
                                             }
@@ -423,6 +426,7 @@ private fun VideoDLScreen() {
                                             val saved = waitForDownloadTask(
                                                 apiBase,
                                                 taskId,
+                                                ownerToken,
                                                 { status = it },
                                                 { progressPercent = it },
                                                 {
@@ -509,8 +513,10 @@ private fun taskStateLabel(state: String): String {
     }
 }
 
-private fun getJson(base: String, path: String): JSONObject {
-    val request = Request.Builder().url(normalizeBase(base) + path).get().build()
+private fun getJson(base: String, path: String, ownerToken: String? = null): JSONObject {
+    val builder = Request.Builder().url(normalizeBase(base) + path)
+    ownerToken?.let { builder.header("X-VideoDL-Owner", it) }
+    val request = builder.get().build()
     httpClient.newCall(request).execute().use { response ->
         val text = response.body?.string().orEmpty()
         if (!response.isSuccessful) throw IOException(extractError(text, response.code))
@@ -518,8 +524,10 @@ private fun getJson(base: String, path: String): JSONObject {
     }
 }
 
-private fun deleteJson(base: String, path: String) {
-    val request = Request.Builder().url(normalizeBase(base) + path).delete().build()
+private fun deleteJson(base: String, path: String, ownerToken: String? = null) {
+    val builder = Request.Builder().url(normalizeBase(base) + path)
+    ownerToken?.let { builder.header("X-VideoDL-Owner", it) }
+    val request = builder.delete().build()
     httpClient.newCall(request).execute().use { response ->
         val text = response.body?.string().orEmpty()
         if (!response.isSuccessful) throw IOException(extractError(text, response.code))
@@ -547,12 +555,13 @@ private suspend fun downloadWithTaskSync(
     }
     val taskId = created.getJSONObject("task").getString("id")
     onTaskCreated(taskId)
-    return waitForDownloadTask(apiBase, taskId, onStatus, onProgress, onTaskTerminal, fetchCompletedFile)
+    return waitForDownloadTask(apiBase, taskId, ownerToken, onStatus, onProgress, onTaskTerminal, fetchCompletedFile)
 }
 
 private suspend fun waitForDownloadTask(
     apiBase: String,
     taskId: String,
+    ownerToken: String,
     onStatus: (String) -> Unit,
     onProgress: (Float?) -> Unit,
     onTaskTerminal: () -> Unit,
@@ -560,7 +569,7 @@ private suspend fun waitForDownloadTask(
 ): String {
     while (true) {
         val task = withContext(Dispatchers.IO) {
-            getJson(apiBase, "/api/tasks/" + taskId).getJSONObject("task")
+            getJson(apiBase, "/api/tasks/" + taskId, ownerToken).getJSONObject("task")
         }
         val state = task.optString("state", "unknown")
         val progress = task.optJSONObject("progress")
@@ -623,10 +632,12 @@ private fun downloadTaskToDownloads(
     resolver: android.content.ContentResolver,
     base: String,
     taskId: String,
-    quality: String
+    quality: String,
+    ownerToken: String
 ): String {
     val request = Request.Builder()
         .url(normalizeBase(base) + "/api/tasks/" + taskId + "/file")
+        .header("X-VideoDL-Owner", ownerToken)
         .get()
         .build()
 
