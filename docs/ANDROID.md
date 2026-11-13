@@ -4,8 +4,8 @@
 
 The Android application is a Kotlin + Jetpack Compose client. It:
 
-1. Connects to the configured HTTPS VideoDL Engine API.
-2. Requests metadata from POST /api/info.
+1. Connects to the configured HTTPS VideoDL Engine API. The app can also receive plain-text share intents and directly opened http(s) links from other apps.
+2. Sends the entered link or entire share text to POST /api/info; the server extracts the actual URL and returns it as source_url. The app then replaces the mixed share text with the clean URL.
 3. Displays title, uploader and thumbnail.
 4. Creates a server task with POST /api/tasks.
 5. Polls GET /api/tasks/{id} and renders the server-reported state and transfer progress.
@@ -13,7 +13,7 @@ The Android application is a Kotlin + Jetpack Compose client. It:
 7. Fetches the completed artifact and writes it to Downloads/VideoDL through MediaStore.
 8. Reads GET /api/tasks?limit=20 to display recent downloads, reconnects to unfinished tasks, and can save a completed server-side task again.
 
-The task identifier and main form values use Compose saveable state. The client also stores a random owner token in private app preferences; this token is sent only for task creation and history-list requests. When the activity is recreated and a task ID remains, the user can choose 恢复同步下载任务 to reconnect to the server-side task.
+The task identifier and main form values use Compose saveable state. The client also stores a random owner token in private app preferences; the same token is sent with task creation, status polling, cancellation, retry, history and file retrieval. When the activity is recreated and a task ID remains, the user can choose 恢复同步下载任务 to reconnect to the server-side task.
 
 ## Build
 

@@ -2,7 +2,7 @@
 
 Base path: /api. All request and response bodies are JSON unless an endpoint returns a media file.
 
-Remote API endpoints must use HTTPS. Requests currently accept publicly accessible media URLs only.
+Remote API endpoints must use HTTPS. Requests currently accept publicly accessible media URLs only. The url field accepts a direct link or copied share text containing a link. The server extracts exactly one URL, then applies the usual public-IP and SSRF checks.
 
 ## Health
 
@@ -44,7 +44,7 @@ Example request:
 
 If the input contains multiple different URLs, the API returns HTTP 400 and asks the caller to submit one link at a time. It does not silently pick one.
 
-Response fields include id, title, thumbnail, duration, uploader, webpage_url, extractor and formats. Each format exposes an id and label; resolution entries may also include width, height, fps and extension. The response includes best and audio choices.
+Response fields include id, title, thumbnail, duration, uploader, webpage_url, extractor, formats and source_url (the cleaned URL extracted from the submitted text). Each format exposes an id and label; resolution entries may also include width, height, fps and extension. The response includes best and audio choices.
 
 ## List recent tasks for one app installation
 
@@ -74,7 +74,7 @@ Request:
 }
 ~~~
 
-When a client wants the task to appear in its private history list, it should also send the same `X-VideoDL-Owner` header used by the history endpoint.
+When a client wants the task to appear in its private history list, it should also send the same `X-VideoDL-Owner` header used by the history endpoint. The Android client also sends this header when polling, cancelling, retrying and fetching the completed file; task ownership is checked on each of those routes.
 
 Quality values:
 
