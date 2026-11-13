@@ -1,77 +1,77 @@
-# VideoDL — 视频下载应用
+# VideoDL — 多平台视频下载应用
 
-VideoDL 是一个以 **Android 原生应用** 为主的多平台视频下载工具。项目不再开发或部署网站；用户通过应用界面使用解析、画质选择、下载和文件管理功能。
+VideoDL 是以 **Android 原生应用** 为主的多平台视频下载项目。它不是网站项目，不包含网页前端；应用使用 Python + yt-dlp 引擎解析公开可访问的媒体，下载任务由队列管理，客户端可以同步查看任务状态与进度。
 
 > 仅下载你拥有版权、已获授权或平台明确允许下载的内容。请遵守目标网站服务条款与当地法律。本项目不提供 DRM、付费墙或访问控制绕过功能。
 
-## 应用定位
+## 技术分工
 
-- **主应用：Android**，使用 Kotlin + Jetpack Compose。
-- **下载引擎：Python**，使用 yt-dlp 解析公开内容，并调用 FFmpeg 处理音视频。
-- **原生下载层：C**，提供 C11 SDK、libcurl 网络传输、流式写盘、进度回调、取消和安全文件落盘。
-- **原生扩展：C++ / Rust**，C++ 复用 C SDK 处理更高层客户端逻辑；Rust 管理可复用任务规则与状态模型。
-- **扩展客户端：Java / Swift / C#**，分别服务 JVM 工具、Apple 原生应用和桌面应用。
-
-仓库中的 Flask 仅作为应用调用的引擎 API，不提供 HTML 页面，不是网站产品。当前 Android 客户端通过配置的 API 地址连接引擎服务。
-
-## 功能现状
-
-| 能力 | 当前状态 |
+| 技术 | 实际职责 |
 |---|---|
-| Android 原生界面 | 已有基础版本 |
-| 公开视频信息解析 | API 已实现 |
-| 封面、标题、上传者和画质列表 | API 与 Android 界面已接入 |
-| 最佳画质、指定分辨率、音频下载 | API 已实现 |
-| 保存到 Android Downloads/VideoDL | 已接入 |
-| C11 SDK / CLI | 已实现流式下载、进度回调、取消、临时文件原子落盘和单元测试 |
-| C++ 客户端 | 已复用 C SDK 作为底层传输层 |
-| Rust 任务核心 | 已有跨平台任务/进度模型和单元测试 |
-| JVM Java 客户端 | 有基础命令行客户端 |
-| Apple Swift 应用 | 有 macOS SwiftUI 客户端源码 |
-| C# 桌面应用 | 有 Avalonia 桌面客户端源码 |
-| 后台持续下载、服务端任务队列、断点续传 | 尚未完成 |
-| 本地离线 yt-dlp 引擎 | 尚未完成；目前 Android 依赖 API 服务 |
+| Kotlin + Jetpack Compose | Android 原生 UI、封面展示、任务状态轮询、进度显示、取消任务、保存到 Downloads |
+| Python + yt-dlp | 站点提取、元数据与格式清单、画质规则、FFmpeg 后处理、任务执行 |
+| C11 + libcurl | 可复用网络 SDK、响应边界限制、下载流式写盘、传输进度、取消、原子文件落盘 |
+| C++17 | 更高层原生客户端，复用 C SDK，不再复制一套 HTTP 传输逻辑 |
+| Rust | 跨平台任务状态机、进度计算、质量解析和安全文件名规则 |
+| Java | JVM 命令行/自动化客户端 |
+| SwiftUI | macOS 原生客户端 |
+| C# + Avalonia | 桌面客户端 |
 
-## 语言分工
+## 现在有的真实功能
 
-| 语言 | 负责模块 | 为什么使用 |
-|---|---|---|
-| Kotlin | Android UI、协程、系统下载目录、通知与任务生命周期 | Android 主应用最合适 |
-| Python | yt-dlp 提取器、FFmpeg 调度、解析 API | yt-dlp 原生生态 |
-| C | libcurl 网络传输、流式写盘、进度回调、取消和 C ABI | 轻量、稳定，便于 NDK/C++/桌面程序复用 |
-| C++ | 更高层原生客户端逻辑、后续 NDK/FFmpeg 媒体集成 | 适合复杂原生媒体与平台适配 |
-| Rust | 统一下载任务状态、进度数据模型、质量规则和安全文件名 | 内存安全、跨平台，适合核心逻辑 |
-| Java | JVM 自动化与兼容客户端 | 复用 JVM 生态；不是 Android 主 UI |
-| Swift | Apple 平台原生应用 | 原生 Apple UI 和系统文件能力 |
-| C# | Avalonia 桌面客户端 | Windows/Linux/macOS 桌面 UI |
+- 公开媒体 URL 校验和基本 SSRF 防护。
+- yt-dlp 元数据解析：标题、封面、作者、时长、可用分辨率。
+- best、指定分辨率、audio 三类下载选择。
+- 后台任务队列：任务 ID、排队、解析、下载、处理、完成、失败和取消状态。
+- 任务状态查询接口，包含已下载字节、总字节、速度、ETA 和百分比。
+- Android 客户端从服务端读取真实任务进度；支持取消任务，并保留任务 ID 以便恢复轮询。
+- 完成后通过独立任务文件接口获取文件，写入 Downloads/VideoDL。
+- C11 SDK 支持流式写文件、进度回调、取消、TLS 校验、临时文件和成功后原子重命名。
+- C++ 客户端复用 C11 SDK。
+- Python、C、Rust 等模块有独立测试；GitHub Actions 构建 Android、C、C++、Java、Rust、Swift 和 C#。
 
-不再保留只为增加语言统计而存在的薄封装。Go 和 TypeScript 示例客户端已移除；网站 UI 相关 HTML、CSS、JavaScript 也已移除。
+**目前还没有完成：** 后端跨重启持久化任务、Redis/多实例队列、断点续传、离线内置 yt-dlp、Android WorkManager 常驻下载、登录态下载和 DRM 处理。不要把这些未完成项当作已经支持的功能。
 
-## 目录
+## 目录结构
 
 ~~~text
 .
-├── app.py                         # Python 下载引擎 API（无网页路由）
-├── requirements.txt
-├── Dockerfile                     # 仅用于运行引擎 API
+├── app.py                         # WSGI 入口
+├── videodl/
+│   ├── app_factory.py              # Flask 应用工厂、依赖装配
+│   ├── api.py                      # API 路由和响应格式
+│   ├── config.py                   # 环境变量与运行配置
+│   ├── security.py                 # URL 与 IP 安全校验
+│   ├── quality.py                  # 画质解析和 yt-dlp 格式选择
+│   ├── engine.py                   # yt-dlp/FFmpeg 引擎适配器
+│   ├── tasks.py                    # 有界任务队列和任务状态
+│   ├── rate_limit.py               # 进程内滑动窗口限流
+│   └── errors.py                   # 业务错误与用户安全提示
 ├── clients/
-│   ├── android/                   # Kotlin + Jetpack Compose
-│   ├── apple/                     # SwiftUI macOS 应用
-│   ├── desktop/                   # C# + Avalonia
-│   ├── java/                      # Java JVM 客户端
-│   ├── cpp/                       # C++ 客户端，复用 C SDK
-│   └── rust/                      # Rust 命令行客户端
+│   ├── android/                    # Kotlin Android App
+│   ├── apple/                      # SwiftUI macOS App
+│   ├── desktop/                    # C# Avalonia App
+│   ├── cpp/                        # C++17 客户端
+│   ├── java/                       # Java 客户端
+│   └── rust/                       # Rust 客户端
 ├── native/
-│   ├── c-client/                  # C11 SDK、CLI、测试
-│   └── rust-core/                 # Rust 任务状态与质量规则核心
+│   ├── c-client/                   # C11 SDK、CLI、单元测试
+│   └── rust-core/                  # Rust 任务核心
+├── tests/                          # Python 单元和 API 测试
 ├── docs/
-│   └── ARCHITECTURE.md
-└── tests/
+│   ├── API.md                      # API 请求、状态和错误定义
+│   ├── ARCHITECTURE.md             # 模块边界和数据流
+│   ├── ANDROID.md                  # Android 客户端说明
+│   ├── SECURITY.md                 # 威胁模型和部署注意事项
+│   └── ROADMAP.md                  # 未完成工作和优先级
+├── .github/workflows/              # 自动测试和多语言构建
+├── Makefile                        # 常用构建和测试入口
+└── Dockerfile                      # Python 引擎容器
 ~~~
 
-## Python 引擎 API
+## 快速启动 Python 引擎
 
-需要 Python 3.11+ 和 FFmpeg。
+需要 Python 3.12+ 和 FFmpeg：
 
 ~~~bash
 python -m venv .venv
@@ -80,70 +80,54 @@ pip install -r requirements.txt
 python app.py
 ~~~
 
-引擎默认监听 8080 端口。它只提供 API：
+默认监听 http://127.0.0.1:8080。远程客户端必须配置 HTTPS 地址。
 
-- GET /api/health：服务健康状态
-- POST /api/info：解析标题、封面、时长、上传者和画质列表
-- POST /api/download：生成下载文件流
+## 下载任务 API
 
-请求示例：
-
-~~~json
-{"url":"https://example.com/public-video"}
-~~~
-
-下载请求还需要 quality，可选 best、audio 或数字分辨率，例如 1080。
-
-## Android 应用
-
-使用 Android Studio 打开 clients/android，运行 app 模块。应用中填写引擎 API 地址和公开视频链接，解析后选择画质并保存到系统 Downloads/VideoDL。
-
-远程引擎必须使用 HTTPS。当前 Android 客户端是应用界面，yt-dlp 仍在 API 服务运行，并非完全离线版本。
-
-## C 原生 SDK 与命令行工具
-
-需要 C11、CMake 和 libcurl：
+推荐使用异步任务接口，而不是旧的同步下载接口：
 
 ~~~bash
-sudo apt-get install -y build-essential cmake pkg-config libcurl4-openssl-dev
-cmake -S native/c-client -B build/c-client -DCMAKE_BUILD_TYPE=Release
+# 1. 创建任务，返回 task.id
+curl -X POST http://127.0.0.1:8080/api/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com/public-video","quality":"1080"}'
+
+# 2. 轮询任务（替换任务 ID）
+curl http://127.0.0.1:8080/api/tasks/TASK_ID
+
+# 3. 取消任务
+curl -X DELETE http://127.0.0.1:8080/api/tasks/TASK_ID
+
+# 4. 任务完成后获取文件
+curl -L http://127.0.0.1:8080/api/tasks/TASK_ID/file -o video.mp4
+~~~
+
+完整接口字段和状态定义见 [docs/API.md](docs/API.md)。
+
+## 测试和构建
+
+~~~bash
+make test
+make test-c
+make build-cpp
+~~~
+
+也可以直接运行：
+
+~~~bash
+python -m unittest discover -s tests -v
+cmake -S native/c-client -B build/c-client
 cmake --build build/c-client --parallel
 ctest --test-dir build/c-client --output-on-failure
 ~~~
 
-详细 API、进度回调、取消和安全文件落盘说明见 native/c-client/README.md。
+Android Studio 打开 clients/android；其他客户端的运行方法见 [clients/README.md](clients/README.md)。
 
-## Apple 应用（SwiftUI）
+## 部署时非常重要
 
-在 macOS 上运行：
+当前任务队列、状态表、限流器和下载文件索引都在**单个 Python 进程内存**。Docker/Gunicorn 因此固定为 **1 个 web worker + 8 个请求线程**；实际下载并发由独立的有界线程池控制。不要随手将 Gunicorn workers 改成 2 或更多，否则创建任务和查询任务可能落在不同进程，客户端就会遇到状态不同步或任务不存在。
 
-~~~bash
-swift build --package-path clients/apple
-swift run --package-path clients/apple
-~~~
-
-## 桌面应用（C# / Avalonia）
-
-需要 .NET 8 SDK：
-
-~~~bash
-dotnet run --project clients/desktop/VideoDL.Desktop.csproj
-~~~
-
-## Java / C++ / Rust 工具
-
-用法与依赖见 clients/README.md。
-
-## 引擎容器
-
-~~~bash
-docker build -t videodl-engine .
-docker run --rm -p 8080:8080 videodl-engine
-~~~
-
-## 安全和部署边界
-
-这是个人或小规模使用的起步项目，不是无限容量的公共下载服务。引擎目前对公开内容工作，不接受用户账号密码或 Cookie。免费主机可能休眠并限制 CPU、磁盘和带宽；高并发部署需要独立队列、共享限流存储和对象存储。
+这是单实例、小规模使用的实现。服务重启后，内存任务状态会丢失；多实例/多 worker 方案需要把任务存储和队列迁移到 Redis/数据库，并把下载结果放到共享对象存储。详见 [docs/SECURITY.md](docs/SECURITY.md)。
 
 ## License
 

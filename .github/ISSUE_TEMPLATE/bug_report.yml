@@ -1,0 +1,32 @@
+name: Bug report
+description: Report a reproducible VideoDL problem
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open the app\n2. Paste a public URL\n3. Start a task"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App or commit version
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sanitized logs
+      description: Remove cookies, tokens, private URLs and personal data before posting.
+    validations:
+      required: false
