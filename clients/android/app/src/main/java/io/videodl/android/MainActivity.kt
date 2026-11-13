@@ -20,6 +20,8 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -54,6 +56,8 @@ class MainActivity : ComponentActivity() {
     private var settingsMessage = ""
     private var history: List<SavedDownload> = emptyList()
     private var lastProgressPush = 0L
+    private var lastDownloadProgressAt = 0L
+    private var downloadWatchdogJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -225,6 +229,27 @@ class MainActivity : ComponentActivity() {
         statusText = "正在准备下载…"
         errorText = ""
         lastProgressPush = 0L
+        lastDownloadProgressAt = SystemClock.elapsedRealtime()
+        downloadWatchdogJob?.cancel()
+        downloadWatchdogJob = activityScope.launch {
+            var lastNotice = ""
+            while (downloading) {
+                delay(5_000L)
+                val idleFor = SystemClock.elapsedRealtime() - lastDownloadProgressAt
+                val notice = when {
+                    idleFor >= 90_000L -> "当前阶段已超过 90 秒没有新进度，正在等待下载器超时返回…"
+                    idleFor >= 20_000L -> "暂时没有收到新数据，正在等待当前下载阶段结束…"
+                    else -> ""
+                }
+                if (notice.isNotBlank() && notice != lastNotice) {
+                    lastNotice = notice
+                    statusText = notice
+                    renderState()
+                } else if (notice.isBlank()) {
+                    lastNotice = ""
+                }
+            }
+        }
         renderState()
 
         activityScope.launch {
@@ -238,6 +263,7 @@ class MainActivity : ComponentActivity() {
                         runOnUiThread {
                             if (!acceptProgress.get() || !downloading) return@runOnUiThread
                             val now = SystemClock.elapsedRealtime()
+                            lastDownloadProgressAt = now
                             if (now - lastProgressPush >= 350L || percent >= 98f) {
                                 lastProgressPush = now
                                 progress = percent.coerceIn(0f, 98f)
@@ -258,6 +284,7 @@ class MainActivity : ComponentActivity() {
                 val savedMedia = withContext(Dispatchers.IO) {
                     saveIntoDownloads(this@MainActivity, file, info.title) { copiedBytes, totalBytes ->
                         val now = SystemClock.elapsedRealtime()
+                        lastDownloadProgressAt = now
                         if (now - lastSaveProgressPush >= 300L || copiedBytes >= totalBytes) {
                             lastSaveProgressPush = now
                             runOnUiThread {
@@ -299,6 +326,8 @@ class MainActivity : ComponentActivity() {
                 statusText = "下载失败"
                 errorText = error.message ?: "下载过程中出现错误。"
             } finally {
+                downloadWatchdogJob?.cancel()
+                downloadWatchdogJob = null
                 acceptProgress.set(false)
                 val remainingDirectory = temporaryDirectory
                 if (remainingDirectory != null) {

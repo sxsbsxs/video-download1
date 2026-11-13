@@ -196,8 +196,7 @@
   }
 
   function homePage() {
-    var html = header() + '<section class="home-intro"><div class="intro-label">VIDEO DOWNLOADER</div>'
-      + '<h1>下载视频</h1></section>';
+    var html = header() + '<section class="home-intro"><h1>下载视频</h1></section>';
     html += '<section class="link-composer"><div class="link-input-wrap">' + svg('link')
       + '<textarea id="video-input" class="url-input" rows="1" placeholder="粘贴视频链接…" '
       + (state.analyzing || state.downloading ? 'disabled' : '') + '>'
@@ -205,7 +204,7 @@
       + (state.analyzing || state.downloading ? ' disabled' : '') + '>' + svg('paste') + '粘贴</button></div>';
     html += '<button class="parse-button" id="analyze"'
       + (state.analyzing || state.downloading || !state.input.trim() ? ' disabled' : '') + '>'
-      + (state.analyzing ? '<span class="spinner"></span>正在解析' : '解析链接' + svg('arrow'))
+      + (state.analyzing ? '<span class="spinner"></span>正在解析' : '解析' + svg('arrow'))
       + '</button></section>';
     html += errorView();
     if (state.video) {
@@ -222,8 +221,7 @@
   }
 
   function filesPage() {
-    var html = header() + '<section class="page-title"><div class="intro-label">LIBRARY</div>'
-      + '<h1>已下载</h1></section>';
+    var html = header() + '<section class="page-title"><h1>已下载</h1></section>';
     if (!state.history || !state.history.length) {
       html += '<div class="empty-library"><div class="empty-art">' + svg('folder') + '</div>'
         + '<div class="empty-title">这里还没有文件</div></div>';
@@ -243,7 +241,7 @@
   }
 
   function settingsPage() {
-    var html = header() + '<section class="page-title"><div class="intro-label">PREFERENCES</div><h1>设置</h1></section>';
+    var html = header() + '<section class="page-title"><h1>设置</h1></section>';
     html += '<section class="settings-group"><div class="settings-caption">存储</div>'
       + '<div class="settings-row"><span class="settings-icon">' + svg('folder') + '</span>'
       + '<div><strong>下载目录</strong><small>Downloads / VideoDL</small></div></div>'

@@ -330,13 +330,13 @@ def _download_one(url, format_id, directory, filename, listener, stage, progress
             eta = int(data.get("eta") or 0)
             speed = data.get("_speed_str") or ""
             if percent >= 99.9:
-                message = stage + " · 数据接收完成，正在封装文件…"
+                message = stage + " · 数据已接收，正在等待下载器结束当前请求…"
             else:
                 message = stage + " · " + str(round(percent, 1)) + "% " + str(speed)
             listener.onProgressUpdate(overall, eta, message)
         elif status == "finished":
             finished_at = min(95.0, progress_start + progress_span)
-            listener.onProgressUpdate(finished_at, 0, stage + "数据接收完成，正在校验文件…")
+            listener.onProgressUpdate(finished_at, 0, stage + "数据接收结束，正在校验输出文件…")
 
     def postprocessor_hook(data):
         if listener is None:
@@ -366,14 +366,26 @@ def _download_one(url, format_id, directory, filename, listener, stage, progress
         "continuedl": True,
         "retries": 3,
         "fragment_retries": 5,
-        "concurrent_fragment_downloads": 4,
+        "concurrent_fragment_downloads": 1,
         "socket_timeout": 30,
         "progress_hooks": [progress_hook],
         "postprocessor_hooks": [postprocessor_hook],
     }
     with yt_dlp.YoutubeDL(options) as ydl:
         info = ydl.extract_info(url, download=True)
+        if listener is not None:
+            listener.onProgressUpdate(
+                min(97.0, progress_start + progress_span + 0.5),
+                0,
+                stage + " · 下载器已返回，正在检查最终文件…",
+            )
         path = _resolve_downloaded_file(ydl, info, directory, filename)
+    if listener is not None:
+        listener.onProgressUpdate(
+            min(97.0, progress_start + progress_span + 0.8),
+            0,
+            stage + " · 文件校验完成",
+        )
     return path
 
 
@@ -389,12 +401,16 @@ def download_plan(url, video_format_id, audio_format_id, output_dir, listener=No
         return json.dumps({"main_path": path, "audio_path": ""})
 
     video_span = 46.0 if audio_format_id else 95.0
+    if listener is not None:
+        listener.onProgressUpdate(0.5, 0, "视频 · 正在连接来源…")
     video_path = _download_one(
         url, video_format_id, output_dir, "video", listener, "视频",
         progress_start=0.0, progress_span=video_span,
     )
     audio_path = ""
     if audio_format_id:
+        if listener is not None:
+            listener.onProgressUpdate(47.0, 0, "视频流已完成，正在开始音频流…")
         audio_path = _download_one(
             url, audio_format_id, output_dir, "audio", listener, "音频",
             progress_start=47.0, progress_span=46.0,

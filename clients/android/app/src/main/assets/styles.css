@@ -132,3 +132,78 @@ button,textarea,select{font:inherit}button{cursor:pointer}
   .download-button{width:100%}
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+
+/* Refined compact layout: content first, no oversized preview card */
+.screen{max-width:760px;padding:0 24px 42px}
+.topbar{height:68px;border-bottom:0;gap:18px}
+.home-intro{padding:34px 0 17px}
+.home-intro h1,.page-title h1{font-size:27px;letter-spacing:-.9px;line-height:1.25;margin:0;font-weight:720}
+.intro-label{display:none}
+.link-composer{padding:5px;border-radius:18px;border-color:#e3e8ef;box-shadow:0 3px 16px rgba(28,48,79,.045);gap:5px}
+.link-input-wrap{gap:10px;padding:0 10px 0 12px}
+.url-input{min-height:48px;padding:12px 0;font-size:13px;resize:none}
+.paste-button{font-size:11px;padding:8px 6px}
+.parse-button{height:44px;border-radius:14px;padding:0 16px;font-size:12px;box-shadow:none}
+.video-result{display:grid;grid-template-columns:112px minmax(0,1fr);gap:14px;align-items:center;margin-top:26px;padding:0 0 18px;border-bottom:1px solid #e7ecf2;max-width:none}
+.cover-frame{width:112px;aspect-ratio:16/10;border-radius:12px;box-shadow:none}
+.cover-fallback{background:#edf1f6}
+.cover-fallback svg{width:27px;height:27px}
+.video-description{padding:0;min-width:0}
+.video-description h2{font-size:14px;line-height:1.45;letter-spacing:-.15px;font-weight:700}
+.video-meta{font-size:10px;margin-top:5px}
+.format-section{margin-top:0;padding:21px 0 0;border-top:0}
+.format-topline{margin-bottom:13px}
+.format-topline h2{font-size:14px;font-weight:720}
+.segmented{border-radius:11px;background:#edf1f6}
+.segmented button{height:30px;min-width:56px;font-size:11px}
+.selector-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.select-field{gap:6px}
+.select-field>span{font-size:10px}
+.select-field select{height:45px;border-radius:12px;padding-left:11px;padding-right:29px;font-size:11px}
+.audio-select{max-width:100%}
+.bottom-action{margin:19px 0 0;padding:0;border:0;display:flex;flex-direction:column;align-items:stretch;gap:10px}
+.save-destination{font-size:10px;padding:0 1px}
+.download-button{width:100%;height:47px;min-width:0;border-radius:14px;background:#216fe5;box-shadow:0 2px 6px rgba(33,111,229,.16)}
+.transfer-state{margin-top:15px;padding:13px 14px;border-radius:14px;box-shadow:none}
+.transfer-label{font-size:11px;font-weight:600}
+.transfer-indicator{animation:transfer-pulse 1.8s ease-out infinite}
+@keyframes transfer-pulse{0%{box-shadow:0 0 0 0 rgba(37,117,233,.24)}70%{box-shadow:0 0 0 6px rgba(37,117,233,0)}100%{box-shadow:0 0 0 0 rgba(37,117,233,0)}}
+.page-title{padding:37px 0 19px}
+.page-title h1{font-size:26px}
+.file-list{border-top:1px solid #e6ebf2}
+.file-row{padding:14px 2px;gap:12px}
+.file-type{width:38px;height:38px;border-radius:12px;background:#edf3fc}
+.file-name{font-size:12px}
+.file-meta{font-size:10px}
+.file-open{width:33px;height:33px;border-radius:11px}
+.empty-library{min-height:230px}
+.empty-art{width:55px;height:55px;border-radius:18px;margin-bottom:13px}
+.empty-title{font-size:12px}
+.settings-group{margin-top:22px}
+.settings-caption{font-size:10px;margin-bottom:8px}
+.settings-row{min-height:61px;gap:11px}
+.settings-icon{width:34px;height:34px;border-radius:11px}
+.settings-row strong{font-size:12px}
+.settings-row small{font-size:10px}
+@media(max-width:430px){
+  .screen{padding-left:17px;padding-right:17px}
+  .topbar{height:64px;gap:9px}
+  .wordmark{font-size:16px;gap:8px}
+  .brand-mark{width:27px;height:27px}
+  .top-tab{height:35px;padding:0 10px;font-size:11px}
+  .icon-button{width:36px;height:36px;border-radius:12px}
+  .home-intro{padding:28px 0 15px}
+  .home-intro h1{font-size:25px}
+  .link-composer{padding:6px;border-radius:17px;flex-wrap:wrap}
+  .link-input-wrap{min-height:45px;padding-left:8px}
+  .url-input{min-height:45px;font-size:12px}
+  .parse-button{width:100%;height:42px}
+  .video-result{grid-template-columns:98px minmax(0,1fr);gap:12px;margin-top:22px}
+  .cover-frame{width:98px;border-radius:11px}
+  .video-description h2{font-size:13px}
+  .format-section{padding-top:18px}
+  .selector-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+  .select-field select{height:44px;font-size:10px;padding-left:9px;padding-right:25px}
+  .bottom-action{margin-top:17px}
+}
