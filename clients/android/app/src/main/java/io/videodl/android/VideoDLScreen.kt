@@ -23,7 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.ContentPaste
@@ -533,7 +533,7 @@ private fun FormatPicker(
                 onClick = { onSelectTab(1) },
                 label = { Text("音频") },
                 leadingIcon = if (state.selectedFormatTab == 1) {
-                    { Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    { Icon(Icons.Filled.InsertDriveFile, contentDescription = null, modifier = Modifier.size(16.dp)) }
                 } else null
             )
         }
