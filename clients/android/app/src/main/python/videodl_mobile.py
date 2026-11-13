@@ -1,7 +1,6 @@
 """On-device yt-dlp bridge for the VideoDL Android application.
 
-This module runs inside the app through Chaquopy. It does not contact a
-VideoDL server: all extraction and media downloads run on the Android device.
+All extraction and media downloads run on the Android device.
 """
 from __future__ import annotations
 
@@ -67,27 +66,36 @@ def extract_video_url(raw: str) -> str:
     return candidates[0]
 
 
-def _size_info(fmt):
+def _size_info(fmt, duration):
+    """Return (bytes, is_approximate), never mislabel a bitrate estimate as exact."""
     exact = fmt.get("filesize")
     if exact:
         return int(exact), False
+
     approximate = fmt.get("filesize_approx")
     if approximate:
         return int(approximate), True
+
+    # yt-dlp bitrates are in kbit/s. This is only an estimate: real VBR size
+    # can differ significantly, so the Android UI prefixes the value with "约".
+    bitrate = fmt.get("abr") or fmt.get("tbr") or fmt.get("vbr")
+    try:
+        bitrate = float(bitrate or 0)
+        duration = float(duration or 0)
+    except (TypeError, ValueError):
+        return 0, False
+
+    if bitrate > 0 and duration > 0:
+        return int(bitrate * 1000.0 / 8.0 * duration), True
     return 0, False
 
 
-def _file_size(fmt):
-    return _size_info(fmt)[0]
-
-
-def _combined_size(video_format, audio_format):
-    video_size, video_approx = _size_info(video_format)
+def _combined_size(video_format, audio_format, duration):
+    video_size, video_approx = _size_info(video_format, duration)
     if audio_format is None:
         return video_size, video_approx
 
-    audio_size, audio_approx = _size_info(audio_format)
-    # Never report a partial stream size as if it were the merged file size.
+    audio_size, audio_approx = _size_info(audio_format, duration)
     if video_size <= 0 or audio_size <= 0:
         return 0, False
     return video_size + audio_size, video_approx or audio_approx
@@ -103,8 +111,35 @@ def _best_audio(formats):
         return None
     return max(choices, key=lambda item: (
         float(item.get("abr") or item.get("tbr") or 0),
-        _file_size(item),
+        int(item.get("filesize") or item.get("filesize_approx") or 0),
     ))
+
+
+def _thumbnail_urls(info):
+    candidates = []
+    for item in info.get("thumbnails") or []:
+        if not isinstance(item, dict):
+            continue
+        url = item.get("url")
+        if not isinstance(url, str) or not url.startswith(("https://", "http://")):
+            continue
+        width = int(item.get("width") or 0)
+        height = int(item.get("height") or 0)
+        candidates.append((width * height, url))
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    ordered = [url for _, url in candidates]
+    direct = info.get("thumbnail")
+    if isinstance(direct, str) and direct.startswith(("https://", "http://")):
+        ordered.append(direct)
+
+    result = []
+    for url in ordered:
+        if url not in result:
+            result.append(url)
+        if len(result) >= 8:
+            break
+    return result
 
 
 def inspect(raw_text):
@@ -125,6 +160,7 @@ def inspect(raw_text):
         raise ValueError("来源没有返回可识别的视频信息。")
 
     formats = info.get("formats") or []
+    duration = float(info.get("duration") or 0)
     best_audio = _best_audio(formats)
     video_options = []
     audio_options = []
@@ -149,7 +185,7 @@ def inspect(raw_text):
                 audio_format = best_audio
                 audio_id = str(best_audio.get("format_id") or "")
                 selected_audio_codec = str(best_audio.get("acodec") or "")
-            total_size, size_is_approx = _combined_size(item, audio_format)
+            total_size, size_is_approx = _combined_size(item, audio_format, duration)
             video_options.append({
                 "key": "v:" + format_id,
                 "format_id": format_id,
@@ -166,7 +202,7 @@ def inspect(raw_text):
                 "bitrate": float(item.get("tbr") or 0),
             })
         elif acodec != "none":
-            size, size_approx = _size_info(item)
+            size, size_approx = _size_info(item, duration)
             audio_options.append({
                 "key": "a:" + format_id,
                 "format_id": format_id,
@@ -192,12 +228,13 @@ def inspect(raw_text):
         reverse=True,
     )
 
+    thumbnails = _thumbnail_urls(info)
     return json.dumps({
         "source_url": url,
         "title": info.get("title") or "未命名视频",
         "uploader": info.get("uploader") or info.get("channel") or "",
-        "thumbnail": info.get("thumbnail") or "",
-        "duration": int(info.get("duration") or 0),
+        "thumbnail_urls": thumbnails,
+        "duration": int(duration),
         "video_formats": video_options,
         "audio_formats": audio_options,
     }, ensure_ascii=False)

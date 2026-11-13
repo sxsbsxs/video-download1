@@ -1,6 +1,8 @@
 package io.videodl.android
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
 import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.ReturnCode
 import com.chaquo.python.Python
@@ -8,15 +10,19 @@ import com.chaquo.python.android.AndroidPlatform
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.security.MessageDigest
 import java.util.UUID
 
 data class VideoInfo(
     val sourceUrl: String,
     val title: String,
     val uploader: String,
-    val thumbnail: String?,
+    val thumbnailPath: String?,
     val durationSeconds: Long,
     val videoFormats: List<VideoFormat>,
     val audioFormats: List<VideoFormat>
@@ -99,6 +105,8 @@ interface LocalYtDlpProgress {
 }
 
 object LocalYtDlpEngine {
+    private const val MAX_THUMBNAIL_BYTES = 12 * 1024 * 1024
+
     private fun python(context: Context): Python {
         if (!Python.isStarted()) {
             Python.start(AndroidPlatform(context.applicationContext))
@@ -110,15 +118,99 @@ object LocalYtDlpEngine {
         val module = python(context).getModule("videodl_mobile")
         val raw = module.callAttr("inspect", pastedText).toString()
         val json = JSONObject(raw)
+        val sourceUrl = json.getString("source_url")
+        val thumbnailUrls = buildList {
+            val array = json.optJSONArray("thumbnail_urls")
+            if (array != null) {
+                for (index in 0 until array.length()) {
+                    array.optString(index).takeIf { it.startsWith("https://") || it.startsWith("http://") }?.let(::add)
+                }
+            }
+            json.optString("thumbnail").takeIf { it.startsWith("https://") || it.startsWith("http://") }?.let(::add)
+        }.distinct()
+        val cachedThumbnail = cacheThumbnail(context, thumbnailUrls, sourceUrl)
         VideoInfo(
-            sourceUrl = json.getString("source_url"),
+            sourceUrl = sourceUrl,
             title = json.optString("title", "未命名视频"),
             uploader = json.optString("uploader"),
-            thumbnail = json.optString("thumbnail").takeIf { it.startsWith("http") },
+            thumbnailPath = cachedThumbnail?.absolutePath,
             durationSeconds = json.optLong("duration"),
             videoFormats = parseFormats(json.optJSONArray("video_formats"), false),
             audioFormats = parseFormats(json.optJSONArray("audio_formats"), true)
         )
+    }
+
+    private fun cacheThumbnail(context: Context, urls: List<String>, sourceUrl: String): File? {
+        if (urls.isEmpty()) return null
+        val directory = File(context.cacheDir, "covers").apply { mkdirs() }
+        val sourceUri = runCatching { Uri.parse(sourceUrl) }.getOrNull()
+        val referer = if (sourceUri?.host != null) "${sourceUri.scheme ?: "https"}://${sourceUri.host}/" else sourceUrl
+
+        for (thumbnailUrl in urls.take(8)) {
+            val digest = MessageDigest.getInstance("SHA-256")
+                .digest(thumbnailUrl.toByteArray())
+                .joinToString("") { "%02x".format(it) }
+            val target = File(directory, "$digest.img")
+            if (target.isFile && target.length() > 0L && isImage(target)) return target
+
+            for (useReferer in listOf(true, false)) {
+                val connection = runCatching {
+                    (URL(thumbnailUrl).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 8_000
+                        readTimeout = 12_000
+                        instanceFollowRedirects = true
+                        requestMethod = "GET"
+                        setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36")
+                        setRequestProperty("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
+                        if (useReferer) setRequestProperty("Referer", referer)
+                    }
+                }.getOrNull() ?: continue
+
+                try {
+                    connection.connect()
+                    val contentType = connection.contentType.orEmpty().lowercase()
+                    if (contentType.startsWith("text/") || contentType.contains("json")) continue
+                    val length = connection.contentLengthLong
+                    if (length > MAX_THUMBNAIL_BYTES) continue
+
+                    val bytes = connection.inputStream.use { input ->
+                        val output = ByteArrayOutputStream()
+                        val buffer = ByteArray(8192)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            if (output.size() + count > MAX_THUMBNAIL_BYTES) throw IOException("封面图片超过大小限制")
+                            output.write(buffer, 0, count)
+                        }
+                        output.toByteArray()
+                    }
+                    if (!isImage(bytes)) continue
+                    val temporary = File(directory, "$digest.tmp")
+                    temporary.writeBytes(bytes)
+                    if (target.exists()) target.delete()
+                    if (!temporary.renameTo(target)) {
+                        temporary.delete()
+                        continue
+                    }
+                    return target
+                } catch (_: Exception) {
+                    // Try the same image URL without a Referer, then try the next thumbnail.
+                } finally {
+                    connection.disconnect()
+                }
+            }
+        }
+        null
+    }
+
+    private fun isImage(file: File): Boolean =
+        runCatching { isImage(file.readBytes()) }.getOrDefault(false)
+
+    private fun isImage(bytes: ByteArray): Boolean {
+        if (bytes.isEmpty()) return false
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        return options.outWidth > 0 && options.outHeight > 0
     }
 
     suspend fun download(

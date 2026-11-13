@@ -1,4 +1,4 @@
-"""Regression tests for truthful on-device format metadata."""
+"""Regression tests for on-device thumbnail and format metadata."""
 from __future__ import annotations
 
 import importlib.util
@@ -9,9 +9,7 @@ from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = (
-    ROOT / "clients" / "android" / "app" / "src" / "main" / "python" / "videodl_mobile.py"
-)
+MODULE_PATH = ROOT / "clients" / "android" / "app" / "src" / "main" / "python" / "videodl_mobile.py"
 SPEC = importlib.util.spec_from_file_location("videodl_mobile", MODULE_PATH)
 assert SPEC is not None and SPEC.loader is not None
 mobile = importlib.util.module_from_spec(SPEC)
@@ -33,6 +31,11 @@ class FakeYoutubeDL:
             "title": "Sample video",
             "uploader": "Sample channel",
             "duration": 42,
+            "thumbnail": "https://img.example.com/medium.jpg",
+            "thumbnails": [
+                {"url": "https://img.example.com/low.jpg", "width": 320, "height": 180},
+                {"url": "https://img.example.com/high.jpg", "width": 1280, "height": 720},
+            ],
             "formats": [
                 {
                     "format_id": "299",
@@ -87,10 +90,7 @@ class MobileFormatMetadataTests(unittest.TestCase):
 
     def test_only_source_formats_are_returned_with_actual_quality_fields(self):
         result = self.get_result()
-        self.assertEqual(
-            [item["format_id"] for item in result["video_formats"]],
-            ["299", "137", "134"],
-        )
+        self.assertEqual([item["format_id"] for item in result["video_formats"]], ["299", "137", "134"])
         best = result["video_formats"][0]
         self.assertEqual(best["width"], 3840)
         self.assertEqual(best["height"], 2160)
@@ -100,17 +100,24 @@ class MobileFormatMetadataTests(unittest.TestCase):
         self.assertEqual(best["filesize"], 8_800_000)
         self.assertFalse(best["filesize_is_approx"])
 
-    def test_approximate_size_is_marked_approximate(self):
+    def test_approximate_file_sizes_are_marked(self):
         result = self.get_result()
         format_1080 = next(item for item in result["video_formats"] if item["format_id"] == "137")
         self.assertEqual(format_1080["filesize"], 3_800_000)
         self.assertTrue(format_1080["filesize_is_approx"])
 
-    def test_missing_video_size_does_not_show_only_audio_stream_size(self):
+    def test_missing_file_size_uses_bitrate_estimate_not_audio_size_only(self):
         result = self.get_result()
         format_720 = next(item for item in result["video_formats"] if item["format_id"] == "134")
-        self.assertEqual(format_720["filesize"], 0)
-        self.assertFalse(format_720["filesize_is_approx"])
+        self.assertEqual(format_720["filesize"], 6_972_000)
+        self.assertTrue(format_720["filesize_is_approx"])
+
+    def test_thumbnail_urls_prefer_highest_resolution_and_limit_candidates(self):
+        result = self.get_result()
+        self.assertEqual(
+            result["thumbnail_urls"][:2],
+            ["https://img.example.com/high.jpg", "https://img.example.com/low.jpg"],
+        )
 
 
 if __name__ == "__main__":

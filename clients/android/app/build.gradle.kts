@@ -13,11 +13,11 @@ android {
         applicationId = "io.videodl.android"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
 
-        // Keep only the ABI used by current Android phones. Chaquopy's Python
-        // runtime and native dependencies otherwise duplicate several MB per ABI.
+        // Current Android phones use ARM64. The x86_64 Python and native
+        // libraries are deliberately not duplicated in the phone APK.
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -49,11 +49,11 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.10.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.foundation:foundation")
     implementation("io.coil-kt:coil-compose:2.7.0")
 
-    // VideoDL only remuxes downloaded streams with -c copy. The minimal LGPL
-    // package avoids bundling unused audio/video encoder libraries.
+    // Stream-copy remuxing only: no optional audio/video encoders.
     implementation("dev.ffmpegkit-maintained:ffmpeg-kit-min:8.1.9")
 }
