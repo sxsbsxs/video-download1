@@ -148,8 +148,10 @@ private fun VideoDLScreen() {
                                 onTaskCreated = { activeTaskId = it },
                                 onStatus = { status = it },
                                 onProgress = { progressPercent = it }
-                            ) {
-                                downloadTaskToDownloads(context.contentResolver, apiBase, it, quality)
+                            ) { taskId ->
+                                withContext(Dispatchers.IO) {
+                                    downloadTaskToDownloads(context.contentResolver, apiBase, taskId, quality)
+                                }
                             }
                             status = "下载完成：" + saved
                             activeTaskId = null
@@ -162,6 +164,38 @@ private fun VideoDLScreen() {
                     }
                 }
             ) { Text("下载到手机") }
+
+            if (!busy && activeTaskId != null) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        scope.launch {
+                            busy = true
+                            progressPercent = null
+                            try {
+                                val taskId = activeTaskId ?: return@launch
+                                val saved = waitForDownloadTask(
+                                    apiBase = apiBase,
+                                    taskId = taskId,
+                                    onStatus = { status = it },
+                                    onProgress = { progressPercent = it }
+                                ) { id ->
+                                    withContext(Dispatchers.IO) {
+                                        downloadTaskToDownloads(context.contentResolver, apiBase, id, quality)
+                                    }
+                                }
+                                status = "下载完成：" + saved
+                                activeTaskId = null
+                                progressPercent = null
+                            } catch (error: Exception) {
+                                status = error.message ?: "恢复任务同步失败。"
+                            } finally {
+                                busy = false
+                            }
+                        }
+                    }
+                ) { Text("恢复同步下载任务") }
+            }
 
             if (busy && activeTaskId != null) {
                 Button(
@@ -243,7 +277,16 @@ private suspend fun downloadWithTaskSync(
     }
     val taskId = created.getJSONObject("task").getString("id")
     onTaskCreated(taskId)
+    return waitForDownloadTask(apiBase, taskId, onStatus, onProgress, fetchCompletedFile)
+}
 
+private suspend fun waitForDownloadTask(
+    apiBase: String,
+    taskId: String,
+    onStatus: (String) -> Unit,
+    onProgress: (Float?) -> Unit,
+    fetchCompletedFile: suspend (taskId: String) -> String
+): String {
     while (true) {
         val task = withContext(Dispatchers.IO) {
             getJson(apiBase, "/api/tasks/" + taskId).getJSONObject("task")

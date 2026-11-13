@@ -15,7 +15,7 @@ class QualitySelection:
 
 
 def normalize_quality(value: object) -> str:
-    quality = str(value or "best").strip().lower()
+    quality = "best" if value is None else str(value).strip().lower()
     if quality in {"best", "audio"}:
         return quality
     if not re.fullmatch(r"\d{3,4}", quality):
