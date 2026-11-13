@@ -103,7 +103,8 @@ class AsyncTaskApiTests(unittest.TestCase):
             {
                 "TESTING": True,
                 "DOWNLOAD_DIR": Path(self.temp_dir.name),
-                "RATE_LIMIT_PER_MINUTE": 1,\n                "TASK_STATUS_RATE_LIMIT_PER_MINUTE": 100,
+                "RATE_LIMIT_PER_MINUTE": 2,
+                "TASK_STATUS_RATE_LIMIT_PER_MINUTE": 100,
                 "MAX_CONCURRENT_DOWNLOADS": 1,
                 "TASK_QUEUE_SIZE": 2,
             },
