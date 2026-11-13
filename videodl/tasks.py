@@ -333,6 +333,7 @@ class DownloadTaskManager:
             percent = min(100.0, task.downloaded_bytes * 100.0 / total)
         return {
             "id": task.id,
+            "quality": task.quality,
             "state": task.state,
             "progress": {
                 "downloaded_bytes": task.downloaded_bytes,

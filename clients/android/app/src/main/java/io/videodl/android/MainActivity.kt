@@ -74,8 +74,12 @@ private fun VideoDLScreen() {
     var thumbnail by rememberSaveable { mutableStateOf(prefs.getString("thumbnail", null)) }
     var status by remember { mutableStateOf("填写服务端地址和公开视频链接后开始解析。") }
     var busy by remember { mutableStateOf(false) }
-    var activeTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var activeTaskId by rememberSaveable {
+        mutableStateOf(prefs.getString("activeTaskId", null))
+    }
     var progressPercent by remember { mutableStateOf<Float?>(null) }
+    var recentTasks by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+    var historyLoading by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -258,6 +262,131 @@ private fun VideoDLScreen() {
         }
 
         Text(status, style = MaterialTheme.typography.bodyMedium)
+
+        Button(
+            enabled = !historyLoading && apiBase.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                scope.launch {
+                    historyLoading = true
+                    try {
+                        recentTasks = withContext(Dispatchers.IO) {
+                            getRecentTasks(apiBase)
+                        }
+                    } catch (error: Exception) {
+                        status = error.message ?: "读取下载历史失败。"
+                    } finally {
+                        historyLoading = false
+                    }
+                }
+            }
+        ) { Text(if (historyLoading) "正在读取下载记录…" else "刷新下载历史") }
+
+        if (recentTasks.isNotEmpty()) {
+            Text("最近下载", style = MaterialTheme.typography.titleLarge)
+            recentTasks.forEach { item ->
+                val taskId = item.optString("id")
+                val taskState = item.optString("state", "unknown")
+                val taskQuality = item.optString("quality", "best")
+                val fileName = item.optString("filename").takeIf { it.isNotBlank() }
+                    ?: "任务 " + taskId.take(8)
+                val progress = item.optJSONObject("progress")
+                val percent = if (progress != null && !progress.isNull("percent")) {
+                    progress.optDouble("percent", -1.0).takeIf { it >= 0.0 }
+                } else {
+                    null
+                }
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(fileName, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "状态：" + taskStateLabel(taskState) + " · 画质：" + taskQuality,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        if (percent != null) {
+                            LinearProgressIndicator(
+                                progress = { (percent.toFloat() / 100f).coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text("传输进度：" + percent.toInt() + "%")
+                        }
+                        item.optString("error").takeIf { it.isNotBlank() }?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error)
+                        }
+                        if (taskState == "completed") {
+                            Button(
+                                enabled = !busy,
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    scope.launch {
+                                        busy = true
+                                        status = "正在保存历史任务文件…"
+                                        try {
+                                            val saved = withContext(Dispatchers.IO) {
+                                                downloadTaskToDownloads(
+                                                    context.contentResolver,
+                                                    apiBase,
+                                                    taskId,
+                                                    taskQuality
+                                                )
+                                            }
+                                            status = "已保存：" + saved
+                                        } catch (error: Exception) {
+                                            status = error.message ?: "保存文件失败。"
+                                        } finally {
+                                            busy = false
+                                        }
+                                    }
+                                }
+                            ) { Text("重新保存到手机") }
+                        } else if (taskState !in listOf("failed", "cancelled") && !busy) {
+                            Button(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    activeTaskId = taskId
+                                    prefs.edit().putString("activeTaskId", taskId).apply()
+                                    scope.launch {
+                                        busy = true
+                                        progressPercent = null
+                                        try {
+                                            val saved = waitForDownloadTask(
+                                                apiBase,
+                                                taskId,
+                                                { status = it },
+                                                { progressPercent = it },
+                                                {
+                                                    activeTaskId = null
+                                                    prefs.edit().remove("activeTaskId").apply()
+                                                }
+                                            ) { completedId ->
+                                                withContext(Dispatchers.IO) {
+                                                    downloadTaskToDownloads(
+                                                        context.contentResolver,
+                                                        apiBase,
+                                                        completedId,
+                                                        taskQuality
+                                                    )
+                                                }
+                                            }
+                                            status = "下载完成：" + saved
+                                            activeTaskId = null
+                                            prefs.edit().remove("activeTaskId").apply()
+                                        } catch (error: Exception) {
+                                            status = error.message ?: "恢复下载任务失败。"
+                                        } finally {
+                                            busy = false
+                                        }
+                                    }
+                                }
+                            ) { Text("继续同步此任务") }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -270,6 +399,29 @@ private fun postJson(base: String, path: String, payload: JSONObject): JSONObjec
         val text = response.body?.string().orEmpty()
         if (!response.isSuccessful) throw IOException(extractError(text, response.code))
         return JSONObject(text)
+    }
+}
+
+
+private fun getRecentTasks(base: String): List<JSONObject> {
+    val response = getJson(base, "/api/tasks?limit=20")
+    val array = response.optJSONArray("tasks") ?: return emptyList()
+    return (0 until array.length()).mapNotNull { index ->
+        array.optJSONObject(index)
+    }
+}
+
+private fun taskStateLabel(state: String): String {
+    return when (state) {
+        "queued" -> "排队中"
+        "resolving" -> "解析中"
+        "downloading" -> "下载中"
+        "processing" -> "处理中"
+        "cancelling" -> "正在取消"
+        "completed" -> "已完成"
+        "failed" -> "失败"
+        "cancelled" -> "已取消"
+        else -> "未知状态"
     }
 }
 

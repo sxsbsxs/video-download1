@@ -68,6 +68,7 @@ class DownloadTaskManagerTests(unittest.TestCase):
                 task = manager.submit("https://example.com/video", "720")
                 completed = self.wait_for_state(manager, task["id"], "completed")
                 self.assertEqual(completed["filename"], "test-video.mp4")
+                self.assertEqual(completed["quality"], "720")
                 self.assertEqual(completed["size_bytes"], len(b"video-bytes"))
                 file_path, filename = manager.get_file(task["id"])
                 self.assertEqual(filename, "test-video.mp4")
