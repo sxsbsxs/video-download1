@@ -101,6 +101,7 @@ class MainActivity : ComponentActivity() {
                     onOpenDownload = { index ->
                         history.getOrNull(index)?.let { openSavedDownload(this, it) }
                     },
+                    onOpenSource = { openSource(it) },
                     onClearHistory = { clearHistory() },
                     onClearTemp = { clearTemp() }
                 )
@@ -112,6 +113,19 @@ class MainActivity : ComponentActivity() {
         downloadWatchdogJob?.cancel()
         activityScope.cancel()
         super.onDestroy()
+    }
+
+    private fun openSource(url: String) {
+        runCatching {
+            Toast.makeText(
+                this,
+                "打开站点后，找到视频并通过系统分享菜单发送给 VideoDL。",
+                Toast.LENGTH_LONG
+            ).show()
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure {
+            Toast.makeText(this, "无法打开该站点。", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun analyzeCurrentInput() {
