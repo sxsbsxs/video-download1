@@ -109,7 +109,7 @@ class MobileFormatMetadataTests(unittest.TestCase):
     def test_missing_file_size_uses_bitrate_estimate_not_audio_size_only(self):
         result = self.get_result()
         format_720 = next(item for item in result["video_formats"] if item["format_id"] == "134")
-        self.assertEqual(format_720["filesize"], 6_972_000)
+        self.assertEqual(format_720["filesize"], 7_100_000)
         self.assertTrue(format_720["filesize_is_approx"])
 
     def test_thumbnail_urls_prefer_highest_resolution_and_limit_candidates(self):

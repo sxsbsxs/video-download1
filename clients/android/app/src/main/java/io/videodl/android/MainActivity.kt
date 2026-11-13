@@ -33,16 +33,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -244,7 +237,7 @@ private fun VideoDLApp(initialText: String) {
                 NavigationBarItem(
                     selected = selectedPage == 1,
                     onClick = { selectedPage = 1 },
-                    icon = { Icon(Icons.Filled.Download, contentDescription = null) },
+                    icon = { Icon(Icons.Filled.List, contentDescription = null) },
                     label = { Text("下载") },
                     colors = navColors
                 )
@@ -356,16 +349,15 @@ private fun VideoDLApp(initialText: String) {
                                 listener = listener
                             )
                             status = "正在保存到 Downloads/VideoDL…"
-                            val savedUri = withContext(Dispatchers.IO) {
+                            val savedMedia = withContext(Dispatchers.IO) {
                                 saveIntoDownloads(context, file, mediaInfo?.title.orEmpty())
                             }
                             val infoTitle = mediaInfo?.title.orEmpty()
-                            val savedName = savedUri.lastPathSegment?.substringAfterLast('/') ?: file.name
                             val item = SavedDownload(
                                 title = infoTitle,
-                                fileName = savedName,
+                                fileName = savedMedia.displayName,
                                 savedAt = System.currentTimeMillis(),
-                                contentUri = savedUri.toString()
+                                contentUri = savedMedia.uri.toString()
                             )
                             history = listOf(item) + history.filterNot { it.contentUri == item.contentUri }.take(19)
                             storeHistory(context, history)
@@ -392,6 +384,7 @@ private fun VideoDLApp(initialText: String) {
             )
             else -> SettingsScreen(
                 modifier = Modifier.fillMaxSize().padding(padding),
+                isDownloading = downloading,
                 message = settingsMessage,
                 onClearHistory = {
                     history = emptyList()
@@ -478,7 +471,7 @@ private fun HomeScreen(
                     .background(VideoDLColors.blue),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.VideoFile, contentDescription = null, tint = Color.White, modifier = Modifier.size(25.dp))
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(25.dp))
             }
             Spacer(Modifier.width(11.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
@@ -531,8 +524,6 @@ private fun HomeScreen(
                     ),
                     trailingIcon = {
                         TextButton(onClick = onPaste, enabled = !analyzing && !downloading) {
-                            Icon(Icons.Filled.ContentPaste, contentDescription = null, modifier = Modifier.size(17.dp))
-                            Spacer(Modifier.width(4.dp))
                             Text("粘贴")
                         }
                     }
@@ -660,7 +651,7 @@ private fun HomeScreen(
                     Spacer(Modifier.width(9.dp))
                     Text("正在下载…", fontWeight = FontWeight.SemiBold)
                 } else {
-                    Icon(Icons.Filled.Download, contentDescription = null)
+                    Icon(Icons.Filled.List, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("下载到手机", fontWeight = FontWeight.SemiBold)
                 }
@@ -708,7 +699,7 @@ private fun VideoSummaryCard(info: VideoInfo) {
                     )
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Filled.VideoFile, contentDescription = null, tint = Color(0xFF9AA0A6), modifier = Modifier.size(42.dp))
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color(0xFF9AA0A6), modifier = Modifier.size(42.dp))
                         Text("封面暂不可用", color = VideoDLColors.muted, style = MaterialTheme.typography.labelMedium)
                     }
                 }
@@ -819,7 +810,7 @@ private fun QualityGroupRow(
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 2.dp, vertical = 0.dp)
                 ) {
                     Icon(
-                        if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
                         contentDescription = null,
                         modifier = Modifier.size(17.dp)
                     )
@@ -930,7 +921,7 @@ private fun DownloadListScreen(
                         modifier = Modifier.size(68.dp).clip(CircleShape).background(VideoDLColors.blueSoft),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Filled.Download, contentDescription = null, tint = VideoDLColors.blue, modifier = Modifier.size(31.dp))
+                        Icon(Icons.Filled.List, contentDescription = null, tint = VideoDLColors.blue, modifier = Modifier.size(31.dp))
                     }
                     Text("还没有下载记录", color = VideoDLColors.ink, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text("完成下载后，文件会显示在这里。", color = VideoDLColors.muted, style = MaterialTheme.typography.bodySmall)
@@ -971,7 +962,7 @@ private fun DownloadListScreen(
                                     style = MaterialTheme.typography.labelSmall
                                 )
                             }
-                            Icon(Icons.Filled.FolderOpen, contentDescription = "打开文件", tint = VideoDLColors.blue)
+                            Icon(Icons.Filled.Info, contentDescription = "打开文件", tint = VideoDLColors.blue)
                         }
                         if (index != history.lastIndex) {
                             Divider(modifier = Modifier.padding(start = 69.dp, end = 14.dp), color = VideoDLColors.line)
@@ -987,6 +978,7 @@ private fun DownloadListScreen(
 @Composable
 private fun SettingsScreen(
     modifier: Modifier,
+    isDownloading: Boolean,
     message: String,
     onClearHistory: () -> Unit,
     onClearTemp: () -> Unit
@@ -998,13 +990,13 @@ private fun SettingsScreen(
 
         SettingsGroup(title = "下载") {
             SettingsRow(
-                icon = { Icon(Icons.Filled.FolderOpen, contentDescription = null, tint = VideoDLColors.blue) },
+                icon = { Icon(Icons.Filled.Info, contentDescription = null, tint = VideoDLColors.blue) },
                 title = "保存位置",
                 subtitle = "Downloads/VideoDL"
             )
             Divider(color = VideoDLColors.line)
             SettingsRow(
-                icon = { Icon(Icons.Filled.VideoFile, contentDescription = null, tint = VideoDLColors.blue) },
+                icon = { Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = VideoDLColors.blue) },
                 title = "下载引擎",
                 subtitle = "本机 Python + yt-dlp，不需要服务器或 API"
             )
@@ -1012,16 +1004,16 @@ private fun SettingsScreen(
 
         SettingsGroup(title = "存储管理") {
             SettingsRow(
-                icon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = VideoDLColors.blue) },
+                icon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = VideoDLColors.blue) },
                 title = "清理临时文件",
                 subtitle = "删除未完成任务的临时缓存，不影响已保存文件",
                 trailing = {
-                    TextButton(onClick = onClearTemp) { Text("清理") }
+                    TextButton(onClick = onClearTemp, enabled = !isDownloading) { Text("清理") }
                 }
             )
             Divider(color = VideoDLColors.line)
             SettingsRow(
-                icon = { Icon(Icons.Filled.DeleteOutline, contentDescription = null, tint = VideoDLColors.error) },
+                icon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = VideoDLColors.error) },
                 title = "清空下载列表",
                 subtitle = "只清除应用内记录，不会删除手机文件",
                 trailing = {
@@ -1115,7 +1107,9 @@ private fun SettingsRow(
     }
 }
 
-private fun saveIntoDownloads(context: Context, source: File, title: String): Uri {
+private data class SavedMedia(val uri: Uri, val displayName: String)
+
+private fun saveIntoDownloads(context: Context, source: File, title: String): SavedMedia {
     val extension = source.extension.ifBlank { "mp4" }
     val safeTitle = title
         .filterNot { it.isISOControl() }
@@ -1141,7 +1135,7 @@ private fun saveIntoDownloads(context: Context, source: File, title: String): Ur
         }
         val complete = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
         context.contentResolver.update(uri, complete, null, null)
-        return uri
+        return SavedMedia(uri, displayName)
     } catch (error: Exception) {
         context.contentResolver.delete(uri, null, null)
         throw error
